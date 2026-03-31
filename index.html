@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Formula 1 Live Dashboard providing real-time data, driver information, and latest session updates.">
+    <title>ApexGrid</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+</head>
+    <body>
+        <header class="app-header">
+            <div class="header-container">
+                <h1 class="app-title">
+                    <span class="highlight">Apex</span>Grid
+                </h1>
+                <p class="app-subtitle">Real-time driver and session analytics</p>
+            </div>
+        </header>
+
+        <main class="app-main">
+            <div id="loading-indicator" class="loading-state">
+                <div class="spinner"></div>
+                <p>Fetching latest track data...</p>
+            </div>
+
+            <div id="error-container" class="error-state hidden">
+                <div class="error-icon">⚠️</div>
+                <p id="error-message">Unable to load data. Please try again later.</p>
+                <button id="retry-button" class="btn">Retry Connection</button>
+            </div>
+
+            <div id="dashboard-content" class="dashboard hidden">
+                <section class="session-section glass-panel">
+                    <h2 class="section-title">Latest Session Information</h2>
+                    <div class="session-details" id="session-info">
+                    </div>
+                </section>
+
+                <section class="drivers-section">
+                    <h2 class="section-title">Current Grid</h2>
+                    <div class="driver-grid" id="driver-grid">
+                    </div>
+                </section>
+            </div>
+        </main>
+
+        <script src="script.js"></script>
+    </body>
+</html>
