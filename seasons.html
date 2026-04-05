@@ -24,8 +24,31 @@
         </div>
     </nav>
     <main class="app-main">
-        <h2 class="section-title">Seasons</h2>
-        <p class="text-muted">Content Coming Soon...</p>
+        <div class="seasons-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+            <h2 class="section-title" style="margin-bottom: 0;">Seasons Calendar</h2>
+            <select id="season-select" style="padding: 0.5rem 1rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.5); color: #fff; font-family: 'Orbitron', sans-serif; font-size: 1rem; cursor: pointer;">
+                <option value="2026">2026</option>
+                <option value="2025">2025</option>
+                <option value="2024">2024</option>
+                <option value="2023">2023</option>
+            </select>
+        </div>
+
+        <div id="loading-indicator" class="loading-state">
+            <div class="spinner"></div>
+            <p>Gathering race positions and building calendar...</p>
+        </div>
+
+        <div id="error-container" class="error-state hidden">
+            <div class="error-icon">⚠️</div>
+            <p id="error-message">Unable to load season data. Please try again later.</p>
+            <button id="retry-button" class="btn">Retry Connection</button>
+        </div>
+
+        <div id="dashboard-content" class="dashboard hidden">
+            <div class="driver-grid" id="seasons-grid"></div>
+        </div>
     </main>
+    <script src="script.js"></script>
 </body>
 </html>

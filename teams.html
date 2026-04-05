@@ -23,8 +23,26 @@
         </div>
     </nav>
     <main class="app-main">
-        <h2 class="section-title">Teams</h2>
-        <p class="text-muted">Content Coming Soon...</p>
+        <div id="loading-indicator" class="loading-state">
+            <div class="spinner"></div>
+            <p>Fetching latest team data...</p>
+        </div>
+
+        <div id="error-container" class="error-state hidden">
+            <div class="error-icon">⚠️</div>
+            <p id="error-message">Unable to load data. Please try again later.</p>
+            <button id="retry-button" class="btn">Retry Connection</button>
+        </div>
+
+        <div id="dashboard-content" class="dashboard hidden">
+            <section class="teams-section">
+                <h2 class="section-title">F1 Teams</h2>
+                <div class="driver-grid" id="team-grid">
+                </div>
+            </section>
+        </div>
     </main>
+
+    <script src="script.js"></script>
 </body>
 </html>
