@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ApexGrid - Game</title>
+    <title>ApexGrid - Fantasy Draft</title>
+    <meta name="description" content="Build your F1 fantasy team, pick your drivers and constructor, then race a random Grand Prix from the 2025 season.">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -23,9 +24,130 @@
             </div>
         </div>
     </nav>
+
     <main class="app-main">
-        <h2 class="section-title">Game</h2>
-        <p class="text-muted">Content Coming Soon...</p>
+
+        <div id="game-loading" class="lb-loading">
+            <div class="spinner"></div>
+            <p>Loading 2025 Championship data…</p>
+        </div>
+
+        <div id="game-error" class="lb-error hidden">
+            <div class="error-icon">⚠️</div>
+            <p id="game-error-msg">Failed to load game data.</p>
+            <button class="btn" id="game-retry-btn">Retry</button>
+        </div>
+
+        <div id="game-draft" class="hidden">
+            <div class="game-header">
+                <div>
+                    <h1 class="section-title" style="margin-bottom:0.25rem;">Fantasy Draft</h1>
+                    <p style="color:#9ca3af;font-size:0.9rem;">2025 Season · Pick 2 drivers + 1 constructor · 100 credits each</p>
+                </div>
+                <button class="btn" id="race-btn" disabled>Start Race 🏁</button>
+            </div>
+
+            <div class="game-arena">
+                <div class="player-panel" id="panel-p1">
+                    <div class="player-header">
+                        <span class="player-badge p1-badge">P1</span>
+                        <span class="player-name">Player 1</span>
+                        <div class="budget-bar-wrap">
+                            <span class="budget-label">Budget</span>
+                            <span class="budget-val" id="p1-budget">100 cr</span>
+                        </div>
+                    </div>
+
+                    <div class="pick-slots">
+                        <div class="pick-slot" id="p1-d1-slot">
+                            <span class="slot-label">Driver 1 <span class="weight-tag">×0.5</span></span>
+                            <div class="slot-empty">tap a driver below</div>
+                        </div>
+                        <div class="pick-slot" id="p1-d2-slot">
+                            <span class="slot-label">Driver 2 <span class="weight-tag">×0.2</span></span>
+                            <div class="slot-empty">tap a driver below</div>
+                        </div>
+                        <div class="pick-slot" id="p1-t1-slot">
+                            <span class="slot-label">Constructor <span class="weight-tag">×0.3</span></span>
+                            <div class="slot-empty">tap a team below</div>
+                        </div>
+                    </div>
+
+                    <div class="roster-section">
+                        <div class="roster-tabs">
+                            <button class="roster-tab active" data-player="1" data-tab="drivers">Drivers</button>
+                            <button class="roster-tab" data-player="1" data-tab="teams">Constructors</button>
+                        </div>
+                        <div class="roster-list" id="p1-drivers-list"></div>
+                        <div class="roster-list hidden" id="p1-teams-list"></div>
+                    </div>
+                </div>
+
+                <div class="vs-divider">
+                    <span>VS</span>
+                </div>
+
+                <div class="player-panel" id="panel-p2">
+                    <div class="player-header">
+                        <span class="player-badge p2-badge">P2</span>
+                        <span class="player-name">Player 2</span>
+                        <div class="budget-bar-wrap">
+                            <span class="budget-label">Budget</span>
+                            <span class="budget-val" id="p2-budget">100 cr</span>
+                        </div>
+                    </div>
+
+                    <div class="pick-slots">
+                        <div class="pick-slot" id="p2-d1-slot">
+                            <span class="slot-label">Driver 1 <span class="weight-tag">×0.5</span></span>
+                            <div class="slot-empty">tap a driver below</div>
+                        </div>
+                        <div class="pick-slot" id="p2-d2-slot">
+                            <span class="slot-label">Driver 2 <span class="weight-tag">×0.2</span></span>
+                            <div class="slot-empty">tap a driver below</div>
+                        </div>
+                        <div class="pick-slot" id="p2-t1-slot">
+                            <span class="slot-label">Constructor <span class="weight-tag">×0.3</span></span>
+                            <div class="slot-empty">tap a team below</div>
+                        </div>
+                    </div>
+
+                    <div class="roster-section">
+                        <div class="roster-tabs">
+                            <button class="roster-tab active" data-player="2" data-tab="drivers">Drivers</button>
+                            <button class="roster-tab" data-player="2" data-tab="teams">Constructors</button>
+                        </div>
+                        <div class="roster-list" id="p2-drivers-list"></div>
+                        <div class="roster-list hidden" id="p2-teams-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="game-results" class="hidden">
+            <div class="results-header">
+                <h1 class="section-title" style="margin-bottom:0.25rem;">Race Results</h1>
+                <p class="results-gp-name" id="results-gp-name"></p>
+            </div>
+
+            <div id="results-loading" class="lb-loading">
+                <div class="spinner"></div>
+                <p id="results-loading-msg">Picking a random Grand Prix…</p>
+            </div>
+
+            <div id="results-content" class="hidden">
+                <div class="winner-banner" id="winner-banner"></div>
+                <div class="results-grid">
+                    <div class="result-card" id="result-p1"></div>
+                    <div class="result-card" id="result-p2"></div>
+                </div>
+                <div class="race-breakdown" id="race-breakdown"></div>
+                <button class="btn" id="play-again-btn" style="margin-top:2rem;">Play Again 🔄</button>
+            </div>
+        </div>
+
     </main>
+
+    <script src="script.js"></script>
 </body>
 </html>

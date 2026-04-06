@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ApexGrid - Leaderboard</title>
+    <title>ApexGrid - Championship Leaderboard</title>
+    <meta name="description" content="F1 Driver and Constructor Championship standings for every season since 2023. Live leaderboard powered by OpenF1.">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -23,9 +24,83 @@
             </div>
         </div>
     </nav>
+
     <main class="app-main">
-        <h2 class="section-title">Leaderboard</h2>
-        <p class="text-muted">Content Coming Soon...</p>
+        <div class="lb-header">
+            <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
+                <h1 class="section-title" style="margin-bottom:0;">Championship Standings</h1>
+                <span class="season-badge" id="season-label">🏆 2026</span>
+            </div>
+            <div class="lb-controls">
+                <select id="lb-season-select" class="lb-season-select" aria-label="Select season">
+                    <option value="2026">2026 Season</option>
+                    <option value="2025">2025 Season</option>
+                    <option value="2024">2024 Season</option>
+                    <option value="2023">2023 Season</option>
+                </select>
+                <div class="lb-tabs" role="tablist">
+                    <button class="lb-tab active" id="tab-drivers" role="tab" aria-selected="true" aria-controls="panel-drivers">Drivers</button>
+                    <button class="lb-tab" id="tab-constructors" role="tab" aria-selected="false" aria-controls="panel-constructors">Constructors</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-panel active" id="panel-drivers" role="tabpanel" aria-labelledby="tab-drivers">
+            <div id="drivers-loading" class="lb-loading">
+                <div class="spinner"></div>
+                <p>Fetching driver standings…</p>
+            </div>
+            <div id="drivers-error" class="lb-error hidden">
+                <div class="error-icon">⚠️</div>
+                <p id="drivers-error-msg">Unable to load driver standings.</p>
+                <button class="btn" id="drivers-retry-btn">Retry</button>
+            </div>
+            <div id="drivers-content" class="hidden">
+                <div class="podium-row" id="drivers-podium"></div>
+                <div class="glass-panel" style="padding:0; overflow:hidden;">
+                    <table class="standings-table" id="drivers-table">
+                        <thead>
+                            <tr>
+                                <th style="width:48px;">#</th>
+                                <th>Driver</th>
+                                <th>Team</th>
+                                <th>PTS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="drivers-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-panel" id="panel-constructors" role="tabpanel" aria-labelledby="tab-constructors">
+            <div id="constructors-loading" class="lb-loading">
+                <div class="spinner"></div>
+                <p>Fetching constructor standings…</p>
+            </div>
+            <div id="constructors-error" class="lb-error hidden">
+                <div class="error-icon">⚠️</div>
+                <p id="constructors-error-msg">Unable to load constructor standings.</p>
+                <button class="btn" id="constructors-retry-btn">Retry</button>
+            </div>
+            <div id="constructors-content" class="hidden">
+                <div class="podium-row" id="constructors-podium"></div>
+                <div class="glass-panel" style="padding:0; overflow:hidden;">
+                    <table class="standings-table" id="constructors-table">
+                        <thead>
+                            <tr>
+                                <th style="width:48px;">#</th>
+                                <th>Constructor</th>
+                                <th>PTS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="constructors-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </main>
+
+    <script src="script.js"></script>
 </body>
 </html>

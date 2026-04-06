@@ -427,3 +427,765 @@ function renderSeasonsGrid(data) {
         seasonsGrid.appendChild(card);
     });
 }
+
+(function initLeaderboard() {
+    const lbSeasonSelect = document.getElementById('lb-season-select');
+    if (!lbSeasonSelect) return;
+
+    const API = 'https://api.openf1.org/v1';
+    const FALLBACK_HEADSHOT = 'https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/fallback/fallback.png.transform/1col/image.png';
+
+    const seasonLabel       = document.getElementById('season-label');
+    const tabDrivers        = document.getElementById('tab-drivers');
+    const tabConstructors   = document.getElementById('tab-constructors');
+    const panelDrivers      = document.getElementById('panel-drivers');
+    const panelConstructors = document.getElementById('panel-constructors');
+
+    const dLoading  = document.getElementById('drivers-loading');
+    const dError    = document.getElementById('drivers-error');
+    const dErrorMsg = document.getElementById('drivers-error-msg');
+    const dContent  = document.getElementById('drivers-content');
+    const dPodium   = document.getElementById('drivers-podium');
+    const dTbody    = document.getElementById('drivers-tbody');
+
+    const cLoading  = document.getElementById('constructors-loading');
+    const cError    = document.getElementById('constructors-error');
+    const cErrorMsg = document.getElementById('constructors-error-msg');
+    const cContent  = document.getElementById('constructors-content');
+    const cPodium   = document.getElementById('constructors-podium');
+    const cTbody    = document.getElementById('constructors-tbody');
+
+    document.getElementById('drivers-retry-btn').addEventListener('click', loadLeaderboard);
+    document.getElementById('constructors-retry-btn').addEventListener('click', loadLeaderboard);
+
+    function switchTab(tab) {
+        [tabDrivers, tabConstructors].forEach(t => {
+            t.classList.remove('active');
+            t.setAttribute('aria-selected', 'false');
+        });
+        [panelDrivers, panelConstructors].forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        tab.setAttribute('aria-selected', 'true');
+        document.getElementById(tab.getAttribute('aria-controls')).classList.add('active');
+    }
+
+    tabDrivers.addEventListener('click', () => switchTab(tabDrivers));
+    tabConstructors.addEventListener('click', () => switchTab(tabConstructors));
+
+    function lbShowEl(el) { el.classList.remove('hidden'); }
+    function lbHideEl(el) { el.classList.add('hidden'); }
+
+    function setDriverState(state, msg) {
+        lbHideEl(dLoading); lbHideEl(dError); lbHideEl(dContent);
+        if (state === 'loading') lbShowEl(dLoading);
+        else if (state === 'error') { dErrorMsg.textContent = msg || 'Unable to load driver standings.'; lbShowEl(dError); }
+        else lbShowEl(dContent);
+    }
+
+    function setConstructorState(state, msg) {
+        lbHideEl(cLoading); lbHideEl(cError); lbHideEl(cContent);
+        if (state === 'loading') lbShowEl(cLoading);
+        else if (state === 'error') { cErrorMsg.textContent = msg || 'Unable to load constructor standings.'; lbShowEl(cError); }
+        else lbShowEl(cContent);
+    }
+
+    function lbTeamColor(hex) { return hex ? `#${hex}` : '#e10600'; }
+
+    function rankClass(i) {
+        if (i === 0) return 'top1';
+        if (i === 1) return 'top2';
+        if (i === 2) return 'top3';
+        return '';
+    }
+
+    function podiumClass(i) {
+        if (i === 0) return 'p1';
+        if (i === 1) return 'p2';
+        if (i === 2) return 'p3';
+        return '';
+    }
+
+    async function getLastLbSessionKey(year) {
+        const now = new Date();
+        const res = await fetch(`${API}/sessions?year=${year}&session_name=Race`);
+        if (!res.ok) throw new Error('Could not fetch sessions');
+        const sessions = await res.json();
+        if (!sessions.length) throw new Error(`No race sessions found for ${year}`);
+
+        const sorted = sessions.sort((a, b) => new Date(a.date_start) - new Date(b.date_start));
+        const completed = sorted.filter(s => new Date(s.date_end || s.date_start) < now);
+        return completed.length > 0
+            ? completed[completed.length - 1].session_key
+            : sorted[0].session_key;
+    }
+
+    function renderDriverPodium(drivers) {
+        dPodium.innerHTML = '';
+        const top3 = drivers.slice(0, 3);
+        const order    = [top3[1], top3[0], top3[2]];
+        const posLabel = ['2nd', '1st', '3rd'];
+        const podumIdx = [1, 0, 2];
+
+        order.forEach((d, i) => {
+            if (!d) return;
+            const pc       = podiumClass(podumIdx[i]);
+            const color    = lbTeamColor(d.team_colour);
+            const name     = d.full_name || `${d.first_name || ''} ${d.last_name || ''}`.trim() || `#${d.driver_number}`;
+            const headshot = d.headshot_url || FALLBACK_HEADSHOT;
+            const pts      = d.points_current ?? '—';
+
+            const card = document.createElement('div');
+            card.className = `podium-card ${pc}`;
+            card.innerHTML = `
+                <div class="podium-rank">${posLabel[i]}</div>
+                <img class="podium-avatar" src="${headshot}" alt="${name}" style="border-color:${color};">
+                <div class="podium-name">${name}</div>
+                <div class="podium-sub">${d.team_name || ''}</div>
+                <div class="podium-pts">${pts} <span style="font-size:0.7rem;font-family:Inter,sans-serif;font-weight:400;color:#9ca3af;">PTS</span></div>
+            `;
+            dPodium.appendChild(card);
+        });
+    }
+
+    function renderDriverTable(drivers) {
+        dTbody.innerHTML = '';
+        drivers.forEach((d, i) => {
+            const color    = lbTeamColor(d.team_colour);
+            const name     = d.full_name || `${d.first_name || ''} ${d.last_name || ''}`.trim() || `#${d.driver_number}`;
+            const headshot = d.headshot_url || FALLBACK_HEADSHOT;
+            const pts      = d.points_current ?? '—';
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="rank-cell ${rankClass(i)}">${i + 1}</td>
+                <td>
+                    <div class="driver-row-info">
+                        <div class="team-color-bar" style="background:${color};"></div>
+                        <img class="driver-thumb" src="${headshot}" alt="${name}" style="border-color:${color};">
+                        <div>
+                            <div class="driver-row-name">${name}</div>
+                            <div class="driver-row-team">${d.name_acronym || ''}</div>
+                        </div>
+                    </div>
+                </td>
+                <td style="color:#9ca3af;font-size:0.88rem;">${d.team_name || '—'}</td>
+                <td class="pts-cell">${pts}</td>
+            `;
+            dTbody.appendChild(tr);
+        });
+    }
+
+    function renderConstructorPodium(teams) {
+        cPodium.innerHTML = '';
+        const top3 = teams.slice(0, 3);
+        const order    = [top3[1], top3[0], top3[2]];
+        const posLabel = ['2nd', '1st', '3rd'];
+        const podumIdx = [1, 0, 2];
+
+        order.forEach((t, i) => {
+            if (!t) return;
+            const pc      = podiumClass(podumIdx[i]);
+            const color   = lbTeamColor(t.team_colour);
+            const initial = (t.team_name || 'T').charAt(0).toUpperCase();
+            const pts     = t.points_current ?? '—';
+
+            const card = document.createElement('div');
+            card.className = `podium-card ${pc}`;
+            card.innerHTML = `
+                <div class="podium-rank">${posLabel[i]}</div>
+                <div class="podium-team-dot" style="background:${color}33;border-color:${color};">${initial}</div>
+                <div class="podium-name">${t.team_name || '—'}</div>
+                <div class="podium-pts">${pts} <span style="font-size:0.7rem;font-family:Inter,sans-serif;font-weight:400;color:#9ca3af;">PTS</span></div>
+            `;
+            cPodium.appendChild(card);
+        });
+    }
+
+    function renderConstructorTable(teams) {
+        cTbody.innerHTML = '';
+        teams.forEach((t, i) => {
+            const color   = lbTeamColor(t.team_colour);
+            const initial = (t.team_name || 'T').charAt(0).toUpperCase();
+            const pts     = t.points_current ?? '—';
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="rank-cell ${rankClass(i)}">${i + 1}</td>
+                <td>
+                    <div class="driver-row-info">
+                        <div class="team-color-bar" style="background:${color};"></div>
+                        <div class="team-thumb" style="background:${color}33;border:2px solid ${color};">${initial}</div>
+                        <div class="driver-row-name">${t.team_name || '—'}</div>
+                    </div>
+                </td>
+                <td class="pts-cell">${pts}</td>
+            `;
+            cTbody.appendChild(tr);
+        });
+    }
+
+    async function loadLeaderboard() {
+        const year = lbSeasonSelect.value;
+        seasonLabel.textContent = `🏆 ${year}`;
+
+        setDriverState('loading');
+        setConstructorState('loading');
+
+        let sessionKey;
+        try {
+            sessionKey = await getLastLbSessionKey(year);
+        } catch (err) {
+            const msg = `No race data found for ${year}. ${err.message}`;
+            setDriverState('error', msg);
+            setConstructorState('error', msg);
+            return;
+        }
+
+        const [dChampRes, cChampRes, driversRes] = await Promise.allSettled([
+            fetch(`${API}/championship_drivers?session_key=${sessionKey}`),
+            fetch(`${API}/championship_teams?session_key=${sessionKey}`),
+            fetch(`${API}/drivers?session_key=${sessionKey}`)
+        ]);
+
+        const driverInfoMap = {};
+        const teamColorMap  = {};
+        if (driversRes.status === 'fulfilled' && driversRes.value.ok) {
+            const driversRaw = await driversRes.value.json();
+            driversRaw.forEach(d => {
+                if (!driverInfoMap[d.driver_number]) driverInfoMap[d.driver_number] = d;
+                if (d.team_name && d.team_colour && !teamColorMap[d.team_name]) teamColorMap[d.team_name] = d.team_colour;
+            });
+        }
+
+        try {
+            if (dChampRes.status !== 'fulfilled' || !dChampRes.value.ok) throw new Error('Failed to fetch driver standings');
+            const dData = await dChampRes.value.json();
+            if (!dData || dData.length === 0) throw new Error('No driver standings data available for this season yet.');
+
+            const enriched = dData.map(entry => Object.assign({}, driverInfoMap[entry.driver_number] || {}, entry));
+            const sorted = enriched.sort((a, b) => (b.points_current ?? 0) - (a.points_current ?? 0));
+            renderDriverPodium(sorted);
+            renderDriverTable(sorted);
+            setDriverState('done');
+        } catch (err) {
+            setDriverState('error', err.message);
+        }
+
+        try {
+            if (cChampRes.status !== 'fulfilled' || !cChampRes.value.ok) throw new Error('Failed to fetch constructor standings');
+            const cData = await cChampRes.value.json();
+            if (!cData || cData.length === 0) throw new Error('No constructor standings data available for this season yet.');
+
+            const enriched = cData.map(entry => Object.assign({}, entry, { team_colour: teamColorMap[entry.team_name] || null }));
+            const sorted = enriched.sort((a, b) => (b.points_current ?? 0) - (a.points_current ?? 0));
+            renderConstructorPodium(sorted);
+            renderConstructorTable(sorted);
+            setConstructorState('done');
+        } catch (err) {
+            setConstructorState('error', err.message);
+        }
+    }
+
+    lbSeasonSelect.addEventListener('change', loadLeaderboard);
+    loadLeaderboard();
+})();
+
+(function initGame() {
+    if (!document.getElementById('game-loading')) return;
+
+    const API = 'https://api.openf1.org/v1';
+    const GAME_YEAR = 2025; 
+    const FALLBACK_IMG = 'https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/fallback/fallback.png.transform/1col/image.png';
+    const F1_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
+
+    const DRIVER_PRICE = (rank) => rank <= 5 ? 50 : rank <= 10 ? 30 : rank <= 15 ? 20 : 10;
+    const TEAM_PRICE   = (rank) => rank <= 3 ? 50 : rank <= 6 ? 30 : 20;
+
+    const gameLoading  = document.getElementById('game-loading');
+    const gameError    = document.getElementById('game-error');
+    const gameErrorMsg = document.getElementById('game-error-msg');
+    const gameDraft    = document.getElementById('game-draft');
+    const gameResults  = document.getElementById('game-results');
+    const raceBtn      = document.getElementById('race-btn');
+    const playAgainBtn = document.getElementById('play-again-btn');
+
+    document.getElementById('game-retry-btn').addEventListener('click', init);
+    playAgainBtn.addEventListener('click', resetGame);
+
+    let allDrivers = [];
+    let allTeams   = [];
+    let raceSessions = [];
+
+    const state = {
+        1: { budget: 100, d1: null, d2: null, team: null },
+        2: { budget: 100, d1: null, d2: null, team: null }
+    };
+
+    function showOnly(el) {
+        [gameLoading, gameError, gameDraft, gameResults].forEach(e => e.classList.add('hidden'));
+        el.classList.remove('hidden');
+    }
+
+    async function init() {
+        showOnly(gameLoading);
+        try {
+            const sessRes = await fetch(`${API}/sessions?year=${GAME_YEAR}&session_name=Race`);
+            if (!sessRes.ok) throw new Error('Could not fetch 2025 sessions');
+            const sessions = await sessRes.json();
+            const now = new Date();
+            const sorted = sessions.sort((a, b) => new Date(a.date_start) - new Date(b.date_start));
+            raceSessions = sorted.filter(s => new Date(s.date_end || s.date_start) < now);
+            if (raceSessions.length === 0) throw new Error('No completed races found for 2025.');
+
+            const lastKey = raceSessions[raceSessions.length - 1].session_key;
+
+            const [dChampRes, cChampRes, driversRes] = await Promise.all([
+                fetch(`${API}/championship_drivers?session_key=${lastKey}`),
+                fetch(`${API}/championship_teams?session_key=${lastKey}`),
+                fetch(`${API}/drivers?session_key=${lastKey}`)
+            ]);
+
+            if (!dChampRes.ok || !cChampRes.ok || !driversRes.ok)
+                throw new Error('Failed to fetch championship data.');
+
+            const [dChamp, cChamp, dInfo] = await Promise.all([
+                dChampRes.json(), cChampRes.json(), driversRes.json()
+            ]);
+
+            const dInfoMap = {};
+            dInfo.forEach(d => { if (!dInfoMap[d.driver_number]) dInfoMap[d.driver_number] = d; });
+
+            const driversSorted = [...dChamp].sort((a, b) => (b.points_current ?? 0) - (a.points_current ?? 0));
+            allDrivers = driversSorted.map((entry, idx) => {
+                const info = dInfoMap[entry.driver_number] || {};
+                return Object.assign({}, info, entry, { price: DRIVER_PRICE(idx + 1), rank: idx + 1 });
+            });
+
+            const teamColorMap = {};
+            allDrivers.forEach(d => { if (d.team_name && d.team_colour) teamColorMap[d.team_name] = d.team_colour; });
+            const teamsSorted = [...cChamp].sort((a, b) => (b.points_current ?? 0) - (a.points_current ?? 0));
+            allTeams = teamsSorted.map((t, idx) => ({
+                ...t,
+                team_colour: teamColorMap[t.team_name] || null,
+                price: TEAM_PRICE(idx + 1),
+                rank: idx + 1
+            }));
+
+            buildDraft();
+            showOnly(gameDraft);
+        } catch (err) {
+            gameErrorMsg.textContent = err.message || 'Unknown error.';
+            showOnly(gameError);
+        }
+    }
+
+    function buildDraft() {
+        [1, 2].forEach(p => {
+            renderRosterDrivers(p);
+            renderRosterTeams(p);
+            updateSlots(p);
+        });
+
+        document.querySelectorAll('.roster-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const player = tab.dataset.player;
+                const tabType = tab.dataset.tab;
+                document.querySelectorAll(`.roster-tab[data-player="${player}"]`).forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById(`p${player}-drivers-list`).classList.toggle('hidden', tabType !== 'drivers');
+                document.getElementById(`p${player}-teams-list`).classList.toggle('hidden', tabType !== 'teams');
+            });
+        });
+
+        raceBtn.addEventListener('click', startRace);
+        checkRaceReady();
+    }
+
+    function teamColorHex(t) { return t.team_colour ? `#${t.team_colour}` : '#e10600'; }
+
+    function renderRosterDrivers(p) {
+        const list = document.getElementById(`p${p}-drivers-list`);
+        list.innerHTML = '';
+        allDrivers.forEach(d => {
+            const el = document.createElement('div');
+            el.className = 'roster-item';
+            el.dataset.num = d.driver_number;
+
+            const name = d.full_name || `${d.first_name || ''} ${d.last_name || ''}`.trim() || `#${d.driver_number}`;
+            const color = teamColorHex(d);
+            const img = d.headshot_url || FALLBACK_IMG;
+
+            el.innerHTML = `
+                <img class="roster-thumb" src="${img}" alt="${name}" style="border-color:${color};">
+                <div class="roster-info">
+                    <div class="roster-name">${name}</div>
+                    <div class="roster-sub">${d.team_name || ''} · #${d.rank}</div>
+                </div>
+                <span class="roster-price">${d.price} cr</span>
+            `;
+            el.addEventListener('click', () => pickDriver(p, d, el));
+            list.appendChild(el);
+        });
+    }
+
+    function renderRosterTeams(p) {
+        const list = document.getElementById(`p${p}-teams-list`);
+        list.innerHTML = '';
+        allTeams.forEach(t => {
+            const el = document.createElement('div');
+            el.className = 'roster-item';
+            el.dataset.team = t.team_name;
+
+            const color = teamColorHex(t);
+            const initial = (t.team_name || 'T').charAt(0).toUpperCase();
+
+            el.innerHTML = `
+                <div class="team-initial-circle" style="background:${color}33;border-color:${color};">${initial}</div>
+                <div class="roster-info">
+                    <div class="roster-name">${t.team_name}</div>
+                    <div class="roster-sub">Rank #${t.rank} · ${t.points_current ?? '?'} pts</div>
+                </div>
+                <span class="roster-price">${t.price} cr</span>
+            `;
+            el.addEventListener('click', () => pickTeam(p, t, el));
+            list.appendChild(el);
+        });
+    }
+
+    function pickDriver(p, driver, el) {
+        if (el.classList.contains('disabled')) return;
+        const ps = state[p];
+        const num = driver.driver_number;
+
+        if (ps.d1 && ps.d1.driver_number === num) {
+            ps.budget += ps.d1.price;
+            ps.d1 = null;
+        } else if (ps.d2 && ps.d2.driver_number === num) {
+            ps.budget += ps.d2.price;
+            ps.d2 = null;
+        } else {
+            if (!ps.d1) {
+                if (ps.budget < driver.price) return;
+                ps.d1 = driver;
+                ps.budget -= driver.price;
+            } else if (!ps.d2) {
+                if (ps.budget < driver.price) return;
+                ps.d2 = driver;
+                ps.budget -= driver.price;
+            } else {
+                return;
+            }
+        }
+
+        refreshAllItems();
+        updateSlots(p);
+        checkRaceReady();
+    }
+
+    function pickTeam(p, team, el) {
+        if (el.classList.contains('disabled')) return;
+        const ps = state[p];
+
+        if (ps.team && ps.team.team_name === team.team_name) {
+            ps.budget += ps.team.price;
+            ps.team = null;
+        } else {
+            if (ps.team) {
+                ps.budget += ps.team.price;
+            }
+            if (ps.budget < team.price) {
+                if (ps.team) ps.budget -= ps.team.price;
+                return;
+            }
+            ps.budget -= team.price;
+            ps.team = team;
+        }
+
+        refreshAllItems();
+        updateSlots(p);
+        checkRaceReady();
+    }
+
+    function refreshAllItems() {
+        const takenDrivers = new Set();
+        [1, 2].forEach(p => {
+            if (state[p].d1) takenDrivers.add(state[p].d1.driver_number);
+            if (state[p].d2) takenDrivers.add(state[p].d2.driver_number);
+        });
+
+        [1, 2].forEach(p => {
+            const ps = state[p];
+            const myDriverNums = new Set();
+            if (ps.d1) myDriverNums.add(ps.d1.driver_number);
+            if (ps.d2) myDriverNums.add(ps.d2.driver_number);
+            const slotsFullForPlayer = ps.d1 && ps.d2;
+
+            document.querySelectorAll(`#p${p}-drivers-list .roster-item`).forEach(item => {
+                const num = Number(item.dataset.num);
+                const isMine = myDriverNums.has(num);
+                const isTakenByOther = takenDrivers.has(num) && !isMine;
+                const driver = allDrivers.find(d => d.driver_number === num);
+                const cantAfford = !isMine && driver && driver.price > ps.budget;
+                const willOverfill = !isMine && slotsFullForPlayer;
+
+                item.classList.toggle('selected', isMine);
+                item.classList.toggle('disabled', isTakenByOther || (!isMine && (cantAfford || willOverfill)));
+            });
+
+            document.querySelectorAll(`#p${p}-teams-list .roster-item`).forEach(item => {
+                const teamName = item.dataset.team;
+                const isMyTeam = ps.team && ps.team.team_name === teamName;
+                const team = allTeams.find(t => t.team_name === teamName);
+                const effectiveBudget = isMyTeam ? ps.budget + team.price : ps.budget;
+                const cantAfford = !isMyTeam && team && team.price > effectiveBudget;
+
+                item.classList.toggle('selected', isMyTeam);
+                item.classList.toggle('disabled', !isMyTeam && cantAfford);
+            });
+
+            document.getElementById(`p${p}-budget`).textContent = `${ps.budget} cr`;
+        });
+    }
+
+    function updateSlots(p) {
+        const ps = state[p];
+
+        function fillDriverSlot(slotId, driver, onClear) {
+            const slot = document.getElementById(slotId);
+            if (!driver) {
+                slot.classList.remove('filled');
+                slot.querySelector('.slot-empty') && null;
+                const label = slot.querySelector('.slot-label');
+                slot.innerHTML = '';
+                slot.appendChild(label);
+                const empty = document.createElement('div');
+                empty.className = 'slot-empty';
+                empty.textContent = 'tap a driver below';
+                slot.appendChild(empty);
+                return;
+            }
+            slot.classList.add('filled');
+            const label = slot.querySelector('.slot-label');
+            const name = driver.full_name || `${driver.first_name || ''} ${driver.last_name || ''}`.trim() || `#${driver.driver_number}`;
+            const color = teamColorHex(driver);
+            slot.innerHTML = '';
+            slot.appendChild(label);
+            const info = document.createElement('div');
+            info.className = 'slot-filled-info';
+            info.innerHTML = `
+                <img class="slot-thumb" src="${driver.headshot_url || FALLBACK_IMG}" style="border-color:${color};" alt="${name}">
+                <span class="slot-name">${name}</span>
+                <span class="slot-price">${driver.price} cr</span>
+                <button class="slot-remove" title="Remove">✕</button>
+            `;
+            info.querySelector('.slot-remove').addEventListener('click', (e) => { e.stopPropagation(); onClear(); });
+            slot.appendChild(info);
+        }
+
+        function fillTeamSlot(slotId, team, onClear) {
+            const slot = document.getElementById(slotId);
+            if (!team) {
+                const label = slot.querySelector('.slot-label');
+                slot.classList.remove('filled');
+                slot.innerHTML = '';
+                slot.appendChild(label);
+                const empty = document.createElement('div');
+                empty.className = 'slot-empty';
+                empty.textContent = 'tap a team below';
+                slot.appendChild(empty);
+                return;
+            }
+            slot.classList.add('filled');
+            const label = slot.querySelector('.slot-label');
+            const color = teamColorHex(team);
+            const initial = (team.team_name || 'T').charAt(0).toUpperCase();
+            slot.innerHTML = '';
+            slot.appendChild(label);
+            const info = document.createElement('div');
+            info.className = 'slot-filled-info';
+            info.innerHTML = `
+                <div style="width:32px;height:32px;border-radius:50%;background:${color}33;border:2px solid ${color};display:flex;align-items:center;justify-content:center;font-weight:900;font-size:0.9rem;color:#fff;flex-shrink:0;">${initial}</div>
+                <span class="slot-name">${team.team_name}</span>
+                <span class="slot-price">${team.price} cr</span>
+                <button class="slot-remove" title="Remove">✕</button>
+            `;
+            info.querySelector('.slot-remove').addEventListener('click', (e) => {
+                e.stopPropagation();
+                onClear();
+            });
+            slot.appendChild(info);
+        }
+
+        fillDriverSlot(`p${p}-d1-slot`, ps.d1, () => { ps.budget += ps.d1.price; ps.d1 = null; refreshAllItems(); updateSlots(p); checkRaceReady(); });
+        fillDriverSlot(`p${p}-d2-slot`, ps.d2, () => { ps.budget += ps.d2.price; ps.d2 = null; refreshAllItems(); updateSlots(p); checkRaceReady(); });
+        fillTeamSlot(`p${p}-t1-slot`, ps.team, () => { ps.budget += ps.team.price; ps.team = null; refreshAllItems(); updateSlots(p); checkRaceReady(); });
+    }
+
+    function checkRaceReady() {
+        const ready = [1, 2].every(p => state[p].d1 && state[p].d2 && state[p].team);
+        raceBtn.disabled = !ready;
+    }
+    async function startRace() {
+        showOnly(gameResults);
+        document.getElementById('results-loading').classList.remove('hidden');
+        document.getElementById('results-content').classList.add('hidden');
+
+        const loadingMsg = document.getElementById('results-loading-msg');
+        loadingMsg.textContent = 'Picking a random Grand Prix…';
+
+        try {
+            const randomSession = raceSessions[Math.floor(Math.random() * raceSessions.length)];
+            const gpName = randomSession.location || randomSession.country_name || 'Unknown GP';
+            document.getElementById('results-gp-name').textContent = `🏁 ${gpName} Grand Prix · ${GAME_YEAR}`;
+
+            loadingMsg.textContent = `Fetching results from ${gpName}…`;
+
+            const [resultRes, driverRes] = await Promise.all([
+                fetch(`${API}/session_result?session_key=${randomSession.session_key}`),
+                fetch(`${API}/drivers?session_key=${randomSession.session_key}`)
+            ]);
+
+            if (!resultRes.ok) throw new Error('Failed to fetch race results');
+            const [results, sessionDrivers] = await Promise.all([resultRes.json(), driverRes.json()]);
+
+            const posMap = {};
+            results.forEach(r => { posMap[r.driver_number] = r.position; });
+
+            const raceDriverMap = {};
+            sessionDrivers.forEach(d => { if (!raceDriverMap[d.driver_number]) raceDriverMap[d.driver_number] = d; });
+
+            const posToPoints = (num) => {
+                const pos = posMap[num];
+                if (!pos || pos < 1 || pos > 10) return 0;
+                return F1_POINTS[pos - 1];
+            };
+
+            const teamPointsInRace = (teamName) => {
+                return sessionDrivers
+                    .filter(d => d.team_name === teamName)
+                    .reduce((sum, d) => sum + posToPoints(d.driver_number), 0);
+            };
+
+            const scores = {};
+            [1, 2].forEach(p => {
+                const ps = state[p];
+                const d1pts  = posToPoints(ps.d1.driver_number);
+                const d2pts  = posToPoints(ps.d2.driver_number);
+                const tpts   = teamPointsInRace(ps.team.team_name);
+                const total  = d1pts * 0.5 + d2pts * 0.2 + tpts * 0.3;
+                scores[p] = { d1pts, d2pts, tpts, total };
+            });
+
+            renderResults(scores, gpName, posMap, raceDriverMap);
+
+        } catch (err) {
+            document.getElementById('results-loading').classList.add('hidden');
+            document.getElementById('results-content').classList.remove('hidden');
+            document.getElementById('winner-banner').innerHTML = `<div class="winner-title">Error</div><div class="winner-name" style="font-size:1rem;color:#9ca3af;">${err.message}</div>`;
+            document.getElementById('winner-banner').className = 'winner-banner w-draw';
+            document.getElementById('race-breakdown').innerHTML = '';
+            document.getElementById('result-p1').innerHTML = '';
+            document.getElementById('result-p2').innerHTML = '';
+        }
+    }
+
+    function renderResults(scores, gpName, posMap, raceDriverMap) {
+        document.getElementById('results-loading').classList.add('hidden');
+        document.getElementById('results-content').classList.remove('hidden');
+
+        const s1 = scores[1].total, s2 = scores[2].total;
+        const banner = document.getElementById('winner-banner');
+
+        if (s1 > s2) {
+            banner.className = 'winner-banner w-p1';
+            banner.innerHTML = `<div class="winner-title">🏆 Winner</div><div class="winner-name">Player 1</div>`;
+        } else if (s2 > s1) {
+            banner.className = 'winner-banner w-p2';
+            banner.innerHTML = `<div class="winner-title">🏆 Winner</div><div class="winner-name">Player 2</div>`;
+        } else {
+            banner.className = 'winner-banner w-draw';
+            banner.innerHTML = `<div class="winner-title">It's a tie!</div><div class="winner-name">DRAW</div>`;
+        }
+
+        [1, 2].forEach(p => {
+            const ps = state[p];
+            const sc = scores[p];
+            const card = document.getElementById(`result-p${p}`);
+            const isWinner = (p === 1 && s1 > s2) || (p === 2 && s2 > s1);
+            card.className = `result-card${isWinner ? ' winner-card' : ''}`;
+
+            const badgeClass = p === 1 ? 'p1-badge' : 'p2-badge';
+            const scoreColor = p === 1 ? '#e10600' : '#3671c6';
+
+            const d1name = ps.d1.full_name || `#${ps.d1.driver_number}`;
+            const d2name = ps.d2.full_name || `#${ps.d2.driver_number}`;
+            const d1color = teamColorHex(ps.d1);
+            const d2color = teamColorHex(ps.d2);
+            const tcolor  = teamColorHex(ps.team);
+            const tInitial = (ps.team.team_name || 'T').charAt(0);
+
+            const d1pos = posMap[ps.d1.driver_number] || 'NC';
+            const d2pos = posMap[ps.d2.driver_number] || 'NC';
+
+            card.innerHTML = `
+                <div class="result-player-header">
+                    <span class="player-badge ${badgeClass}">P${p}</span>
+                    <span style="font-weight:600;">Player ${p}</span>
+                    <span class="result-score" style="color:${scoreColor};">${sc.total.toFixed(1)}</span>
+                </div>
+                <div class="result-pick-row">
+                    <span class="result-pick-label">Driver 1 ×0.5</span>
+                    <img class="result-pick-thumb" src="${ps.d1.headshot_url || FALLBACK_IMG}" style="border-color:${d1color};" alt="${d1name}">
+                    <span class="result-pick-name">${d1name}</span>
+                    <span class="result-pick-pts">P${d1pos} · ${sc.d1pts}pts</span>
+                    <span class="result-pick-contrib">+${(sc.d1pts * 0.5).toFixed(1)}</span>
+                </div>
+                <div class="result-pick-row">
+                    <span class="result-pick-label">Driver 2 ×0.2</span>
+                    <img class="result-pick-thumb" src="${ps.d2.headshot_url || FALLBACK_IMG}" style="border-color:${d2color};" alt="${d2name}">
+                    <span class="result-pick-name">${d2name}</span>
+                    <span class="result-pick-pts">P${d2pos} · ${sc.d2pts}pts</span>
+                    <span class="result-pick-contrib">+${(sc.d2pts * 0.2).toFixed(1)}</span>
+                </div>
+                <div class="result-pick-row">
+                    <span class="result-pick-label">Team ×0.3</span>
+                    <div class="result-pick-thumb" style="background:${tcolor}33;border:2px solid ${tcolor};display:flex;align-items:center;justify-content:center;font-weight:900;color:#fff;">${tInitial}</div>
+                    <span class="result-pick-name">${ps.team.team_name}</span>
+                    <span class="result-pick-pts">${sc.tpts}pts</span>
+                    <span class="result-pick-contrib">+${(sc.tpts * 0.3).toFixed(1)}</span>
+                </div>
+            `;
+        });
+
+        const bd = document.getElementById('race-breakdown');
+        bd.innerHTML = `
+            <h3>Scoring Formula</h3>
+            <p style="color:#9ca3af;font-size:0.85rem;line-height:1.7;">
+                <strong style="color:#f4f4f5;">Driver 1 pts × 0.5</strong> + 
+                <strong style="color:#f4f4f5;">Driver 2 pts × 0.2</strong> + 
+                <strong style="color:#f4f4f5;">Constructor pts × 0.3</strong><br>
+                Constructor points = sum of F1 race points earned by both team drivers in this Grand Prix.
+            </p>
+        `;
+    }
+
+    function resetGame() {
+        state[1] = { budget: 100, d1: null, d2: null, team: null };
+        state[2] = { budget: 100, d1: null, d2: null, team: null };
+
+        [1, 2].forEach(p => {
+            updateSlots(p);
+            document.querySelectorAll(`.roster-tab[data-player="${p}"]`).forEach((t, i) => {
+                t.classList.toggle('active', i === 0);
+            });
+            document.getElementById(`p${p}-drivers-list`).classList.remove('hidden');
+            document.getElementById(`p${p}-teams-list`).classList.add('hidden');
+        });
+
+        refreshAllItems();
+        checkRaceReady();
+        showOnly(gameDraft);
+    }
+
+    init();
+})();
