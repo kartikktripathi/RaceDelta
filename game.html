@@ -22,22 +22,21 @@
                 <a href="leaderboard.html" class="nav-link">Leaderboard</a>
                 <a href="game.html" class="nav-link active">Game</a>
             </div>
+            <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode">
+                <span class="theme-icon">☀️</span>
+            </button>
         </div>
     </nav>
-
     <main class="app-main">
-
         <div id="game-loading" class="lb-loading">
             <div class="spinner"></div>
             <p>Loading 2025 Championship data…</p>
         </div>
-
         <div id="game-error" class="lb-error hidden">
             <div class="error-icon">⚠️</div>
             <p id="game-error-msg">Failed to load game data.</p>
             <button class="btn" id="game-retry-btn">Retry</button>
         </div>
-
         <div id="game-draft" class="hidden">
             <div class="game-header">
                 <div>
@@ -46,7 +45,6 @@
                 </div>
                 <button class="btn" id="race-btn" disabled>Start Race 🏁</button>
             </div>
-
             <div class="game-arena">
                 <div class="player-panel" id="panel-p1">
                     <div class="player-header">
@@ -57,7 +55,6 @@
                             <span class="budget-val" id="p1-budget">100 cr</span>
                         </div>
                     </div>
-
                     <div class="pick-slots">
                         <div class="pick-slot" id="p1-d1-slot">
                             <span class="slot-label">Driver 1 <span class="weight-tag">×0.5</span></span>
@@ -72,7 +69,6 @@
                             <div class="slot-empty">tap a team below</div>
                         </div>
                     </div>
-
                     <div class="roster-section">
                         <div class="roster-tabs">
                             <button class="roster-tab active" data-player="1" data-tab="drivers">Drivers</button>
@@ -82,11 +78,9 @@
                         <div class="roster-list hidden" id="p1-teams-list"></div>
                     </div>
                 </div>
-
                 <div class="vs-divider">
                     <span>VS</span>
                 </div>
-
                 <div class="player-panel" id="panel-p2">
                     <div class="player-header">
                         <span class="player-badge p2-badge">P2</span>
@@ -96,7 +90,6 @@
                             <span class="budget-val" id="p2-budget">100 cr</span>
                         </div>
                     </div>
-
                     <div class="pick-slots">
                         <div class="pick-slot" id="p2-d1-slot">
                             <span class="slot-label">Driver 1 <span class="weight-tag">×0.5</span></span>
@@ -111,7 +104,6 @@
                             <div class="slot-empty">tap a team below</div>
                         </div>
                     </div>
-
                     <div class="roster-section">
                         <div class="roster-tabs">
                             <button class="roster-tab active" data-player="2" data-tab="drivers">Drivers</button>
@@ -123,18 +115,15 @@
                 </div>
             </div>
         </div>
-
         <div id="game-results" class="hidden">
             <div class="results-header">
                 <h1 class="section-title" style="margin-bottom:0.25rem;">Race Results</h1>
                 <p class="results-gp-name" id="results-gp-name"></p>
             </div>
-
             <div id="results-loading" class="lb-loading">
                 <div class="spinner"></div>
                 <p id="results-loading-msg">Picking a random Grand Prix…</p>
             </div>
-
             <div id="results-content" class="hidden">
                 <div class="winner-banner" id="winner-banner"></div>
                 <div class="results-grid">
@@ -145,9 +134,7 @@
                 <button class="btn" id="play-again-btn" style="margin-top:2rem;">Play Again 🔄</button>
             </div>
         </div>
-
     </main>
-
     <script src="script.js"></script>
 </body>
 </html>

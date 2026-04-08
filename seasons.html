@@ -21,6 +21,9 @@
                 <a href="leaderboard.html" class="nav-link">Leaderboard</a>
                 <a href="game.html" class="nav-link">Game</a>
             </div>
+            <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode">
+                <span class="theme-icon">☀️</span>
+            </button>
         </div>
     </nav>
     <main class="app-main">
@@ -33,18 +36,15 @@
                 <option value="2023">2023</option>
             </select>
         </div>
-
         <div id="loading-indicator" class="loading-state">
             <div class="spinner"></div>
             <p>Gathering race positions and building calendar...</p>
         </div>
-
         <div id="error-container" class="error-state hidden">
             <div class="error-icon">⚠️</div>
             <p id="error-message">Unable to load season data. Please try again later.</p>
             <button id="retry-button" class="btn">Retry Connection</button>
         </div>
-
         <div id="dashboard-content" class="dashboard hidden">
             <div class="page-controls" id="season-controls">
                 <div class="search-wrap">
@@ -62,7 +62,6 @@
             <div class="driver-grid" id="seasons-grid"></div>
             <p class="no-results hidden" id="season-no-results">No races match your search / filter.</p>
         </div>
-
     </main>
     <script src="script.js"></script>
 </body>

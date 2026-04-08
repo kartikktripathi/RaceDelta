@@ -22,9 +22,11 @@
                 <a href="leaderboard.html" class="nav-link active">Leaderboard</a>
                 <a href="game.html" class="nav-link">Game</a>
             </div>
+            <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode">
+                <span class="theme-icon">☀️</span>
+            </button>
         </div>
     </nav>
-
     <main class="app-main">
         <div class="lb-header">
             <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
@@ -44,7 +46,6 @@
                 </div>
             </div>
         </div>
-
         <div class="tab-panel active" id="panel-drivers" role="tabpanel" aria-labelledby="tab-drivers">
             <div id="drivers-loading" class="lb-loading">
                 <div class="spinner"></div>
@@ -72,7 +73,6 @@
                 </div>
             </div>
         </div>
-
         <div class="tab-panel" id="panel-constructors" role="tabpanel" aria-labelledby="tab-constructors">
             <div id="constructors-loading" class="lb-loading">
                 <div class="spinner"></div>
@@ -100,7 +100,6 @@
             </div>
         </div>
     </main>
-
     <script src="script.js"></script>
 </body>
 </html>

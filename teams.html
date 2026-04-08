@@ -20,6 +20,9 @@
                 <a href="leaderboard.html" class="nav-link">Leaderboard</a>
                 <a href="game.html" class="nav-link">Game</a>
             </div>
+            <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode">
+                <span class="theme-icon">☀️</span>
+            </button>
         </div>
     </nav>
     <main class="app-main">
@@ -27,13 +30,11 @@
             <div class="spinner"></div>
             <p>Fetching latest team data...</p>
         </div>
-
         <div id="error-container" class="error-state hidden">
             <div class="error-icon">⚠️</div>
             <p id="error-message">Unable to load data. Please try again later.</p>
             <button id="retry-button" class="btn">Retry Connection</button>
         </div>
-
         <div id="dashboard-content" class="dashboard hidden">
             <section class="teams-section">
                 <h2 class="section-title">F1 Teams</h2>
@@ -42,7 +43,6 @@
             </section>
         </div>
     </main>
-
     <script src="script.js"></script>
 </body>
 </html>
