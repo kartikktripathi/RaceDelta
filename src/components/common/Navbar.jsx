@@ -1,11 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { motion, useScroll, useMotionValueEvent } from 'framer-motion';
-import { useTheme } from '../../context/ThemeContext';
 import styles from './Navbar.module.css';
 
 export default function Navbar() {
-  const { isLight, toggleTheme } = useTheme();
   const { scrollY } = useScroll();
   const [hidden, setHidden] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -31,9 +29,9 @@ export default function Navbar() {
         animate={hidden ? "hidden" : "visible"}
         transition={{ duration: 0.35, ease: "easeInOut" }}
         style={{
-          background: scrolled 
-            ? (isLight ? 'rgba(255,255,255,0.85)' : 'rgba(15,15,17,0.85)')
-            : (isLight ? 'rgba(255,255,255,0.4)' : 'rgba(15,15,17,0.4)'),
+          background: scrolled ? 'rgba(10,10,10,0.85)' : 'transparent',
+          borderColor: scrolled ? 'rgba(255,255,255,0.05)' : 'transparent',
+          boxShadow: scrolled ? '0 10px 30px rgba(0,0,0,0.5)' : 'none'
         }}
       >
         <div className={styles.container}>
@@ -44,12 +42,8 @@ export default function Navbar() {
             <NavLink to="/drivers" className={({isActive}) => isActive ? styles.activeLink : styles.link}>Drivers</NavLink>
             <NavLink to="/teams" className={({isActive}) => isActive ? styles.activeLink : styles.link}>Teams</NavLink>
             <NavLink to="/seasons" className={({isActive}) => isActive ? styles.activeLink : styles.link}>Seasons</NavLink>
-            <NavLink to="/leaderboard" className={({isActive}) => isActive ? styles.activeLink : styles.link}>Leaderboard</NavLink>
-            <NavLink to="/game" className={({isActive}) => isActive ? styles.activeLink : styles.link}>Game</NavLink>
+            <NavLink to="/leaderboard" className={({isActive}) => isActive ? styles.activeLink : styles.link}>Standings</NavLink>
           </div>
-          <button onClick={toggleTheme} className={styles.themeToggle} aria-label="Toggle theme">
-            <span className={styles.themeIcon}>{isLight ? '🌙' : '☀️'}</span>
-          </button>
         </div>
       </motion.nav>
     </div>

@@ -1,203 +1,262 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { motion, useScroll, useTransform } from 'framer-motion';
+import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { f1Api } from '../utils/api';
-import LoadingState from '../components/common/LoadingState';
-import ErrorState from '../components/common/ErrorState';
+
+const HERO_IMG = '/hero_f1_car_1777223873047.png';
+
+// Mock data fallbacks for design if API fails entirely
+const mockDrivers = [
+  { driver_number: 1, full_name: "Max Verstappen", team_name: "Red Bull Racing", points: 395, color: "#3671C6" },
+  { driver_number: 16, full_name: "Charles Leclerc", team_name: "Ferrari", points: 307, color: "#E80020" },
+  { driver_number: 4, full_name: "Lando Norris", team_name: "McLaren", points: 285, color: "#FF8000" },
+  { driver_number: 55, full_name: "Carlos Sainz", team_name: "Ferrari", points: 244, color: "#E80020" },
+];
+
+const mockRaces = [
+  { round: 1, country: "Bahrain", circuit: "Bahrain International Circuit", date: "Mar 02" },
+  { round: 2, country: "Saudi Arabia", circuit: "Jeddah Corniche Circuit", date: "Mar 09" },
+  { round: 3, country: "Australia", circuit: "Albert Park Circuit", date: "Mar 24" },
+  { round: 4, country: "Japan", circuit: "Suzuka International Racing Course", date: "Apr 07" },
+];
 
 export default function Home() {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
+  const navigate = useNavigate();
+  const [drivers, setDrivers] = useState(mockDrivers);
+  const [races, setRaces] = useState(mockRaces);
+  
   const containerRef = useRef(null);
   const { scrollYProgress } = useScroll({
     target: containerRef,
-    offset: ["start start", "end start"]
+    offset: ["start start", "end end"]
   });
 
-  const yBg = useTransform(scrollYProgress, [0, 1], ["0%", "50%"]);
-  const yText = useTransform(scrollYProgress, [0, 1], ["0%", "150%"]);
-  const opacityText = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
-
-  const fetchDashboardData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const currentYear = new Date().getFullYear();
-      const meetings = await f1Api.getMeetings(currentYear);
-      
-      meetings.sort((a, b) => new Date(a.date_start) - new Date(b.date_start));
-      const now = new Date();
-      const nextMeeting = meetings.find(m => new Date(m.date_end || m.date_start) > now);
-
-      if (nextMeeting) {
-        setData({ type: 'next_gp', data: nextMeeting });
-      } else {
-        const [drivers, teams] = await Promise.all([
-          f1Api.getChampionshipDrivers('latest').catch(() => []),
-          f1Api.getChampionshipTeams('latest').catch(() => [])
-        ]);
-        
-        const dChamp = drivers?.sort((a, b) => b.points_current - a.points_current)[0];
-        const tChamp = teams?.sort((a, b) => b.points_current - a.points_current)[0];
-        
-        setData({ type: 'season_ended', driver: dChamp, team: tChamp });
-      }
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Fetch real data to override mocks if available
   useEffect(() => {
-    fetchDashboardData();
+    const loadData = async () => {
+      try {
+        // Fetch championship points and driver details
+        const [d, allDrivers] = await Promise.all([
+          f1Api.getChampionshipDrivers('latest'),
+          f1Api.getDrivers('latest')
+        ]);
+
+        if (d && d.length > 0 && allDrivers && allDrivers.length > 0) {
+          const sorted = d.sort((a, b) => b.points_current - a.points_current).slice(0, 5).map(driver => {
+            const driverInfo = allDrivers.find(x => x.driver_number === driver.driver_number) || {};
+            return {
+               driver_number: driver.driver_number,
+               full_name: driverInfo.full_name || 'Unknown Driver',
+               team_name: driverInfo.team_name || 'Unknown Team',
+               points: driver.points_current,
+               color: driverInfo.team_colour ? `#${driverInfo.team_colour}` : '#ffffff'
+            };
+          });
+          setDrivers(sorted);
+        }
+
+        // Fetch calendar
+        let currentYear = new Date().getFullYear();
+        let meetings = await f1Api.getMeetings(currentYear);
+        
+        // If current year is empty (e.g., 2026 data not yet available), fallback to 2024
+        if (!meetings || meetings.length === 0) {
+           meetings = await f1Api.getMeetings(2024);
+        }
+
+        if (meetings && meetings.length > 0) {
+          const sortedM = meetings.sort((a, b) => new Date(a.date_start) - new Date(b.date_start)).map((m, i) => ({
+            round: i + 1,
+            country: m.country_name,
+            circuit: m.circuit_short_name || m.location,
+            date: new Date(m.date_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            rawDate: new Date(m.date_start)
+          }));
+          
+          const now = new Date();
+          let upcoming = sortedM.filter(m => {
+            // Treat the fetched schedule as if it's running in the current year to show upcoming races correctly
+            const virtualDate = new Date(m.rawDate);
+            virtualDate.setFullYear(now.getFullYear());
+            return virtualDate >= now;
+          });
+          
+          // If all races are in the past relative to current day/month, just show the last 5 races
+          if (upcoming.length === 0) upcoming = sortedM.slice(-5);
+          else upcoming = upcoming.slice(0, 5);
+
+          setRaces(upcoming);
+        }
+      } catch (err) {
+        console.log("Using mock data due to API error", err);
+      }
+    };
+    loadData();
   }, []);
 
   return (
-    <div ref={containerRef} style={{ position: 'relative', width: '100vw', left: '50%', right: '50%', marginLeft: '-50vw', marginRight: '-50vw', overflowX: 'hidden' }}>
+    <div ref={containerRef} style={{ background: 'var(--color-bg-base)', minHeight: '100vh', width: '100vw', left: '50%', right: '50%', marginLeft: '-50vw', marginRight: '-50vw', position: 'relative' }}>
       
-      {/* Hero Section */}
-      <div style={{ height: '100vh', width: '100%', position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <motion.div 
-          style={{
-            position: 'absolute',
-            top: 0, left: 0, right: 0, bottom: '-20%', // extra height for parallax smooth scrolling
-            backgroundImage: 'url(/WP.jpg)',
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            y: yBg,
-            zIndex: -2,
-            filter: 'brightness(0.5)'
-          }}
-        />
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(to bottom, transparent 60%, var(--color-bg-base) 100%)', zIndex: -1 }}></div>
-        
-        <motion.div 
-          style={{ y: yText, opacity: opacityText, textAlign: 'center', zIndex: 1, padding: '0 2rem' }}
-        >
-          <motion.h1 
-            initial={{ opacity: 0, scale: 0.9, y: 30 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-            style={{ 
-              fontFamily: 'var(--font-logo)',
-              fontSize: 'clamp(4rem, 10vw, 8rem)', 
-              fontWeight: 900,
-              lineHeight: 1,
-              letterSpacing: '5px',
-              textTransform: 'uppercase',
-              color: '#fff',
-              margin: 0,
-              textShadow: '0 10px 30px rgba(0,0,0,0.5)'
-            }}
-          >
-            <span style={{ color: 'var(--color-accent-primary)' }}>Apex</span>Grid
-          </motion.h1>
-          <motion.p 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
-            style={{ 
-              fontSize: 'clamp(1rem, 2vw, 1.5rem)', 
-              color: '#eaeaea', 
-              marginTop: '1rem',
-              letterSpacing: '2px',
-              fontWeight: 300,
-              textTransform: 'uppercase'
-            }}
-          >
-            The Ultimate F1 Data Experience
-          </motion.p>
+      {/* 1. HERO SECTION */}
+      <HeroSection scrollYProgress={scrollYProgress} onExplore={() => navigate('/seasons')} />
 
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1, duration: 1, repeat: Infinity, repeatType: 'reverse' }}
-            style={{ marginTop: '4rem', color: '#fff', fontSize: '2rem' }}
-          >
-            ↓
-          </motion.div>
+      {/* 2. DRIVER STANDINGS */}
+      <StandingsSection drivers={drivers} />
+
+      {/* 3. RACE CALENDAR TIMELINE */}
+      <CalendarSection races={races} />
+
+      {/* 4. FOOTER */}
+      <Footer />
+    </div>
+  );
+}
+
+function HeroSection({ scrollYProgress, onExplore }) {
+  const y = useTransform(scrollYProgress, [0, 1], ["0%", "40%"]);
+  const opacity = useTransform(scrollYProgress, [0, 0.2], [1, 0]);
+
+  return (
+    <div style={{ height: '100vh', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+      <motion.div 
+        style={{
+          position: 'absolute', top: '-10%', left: 0, right: 0, bottom: '-10%',
+          backgroundImage: `url(${HERO_IMG})`, backgroundSize: 'cover', backgroundPosition: 'center',
+          y, zIndex: 0, filter: 'brightness(0.6) contrast(1.1)'
+        }}
+      />
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '50vh', background: 'linear-gradient(to top, var(--color-bg-base), transparent)', zIndex: 1 }} />
+      
+      <div style={{ position: 'relative', zIndex: 2, padding: '0 5vw', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        <motion.p
+          initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.8, delay: 0.2 }}
+          style={{ fontFamily: 'var(--font-heading)', color: 'var(--color-accent-primary)', fontSize: '1rem', letterSpacing: '0.2em', textTransform: 'uppercase' }}
+        >
+          World Championship
+        </motion.p>
+        
+        <motion.h1
+          initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
+          style={{ fontSize: 'clamp(3.5rem, 8vw, 9rem)', lineHeight: 0.85, margin: 0, maxWidth: '1200px' }}
+        >
+          THE APEX <br/>
+          <span style={{ color: 'transparent', WebkitTextStroke: '1px rgba(255,255,255,0.3)' }}>OF MOTORSPORT</span>
+        </motion.h1>
+
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }} style={{ marginTop: '2rem' }}>
+          <button onClick={onExplore} className="btn" style={{ fontSize: '0.9rem', padding: '1rem 2.5rem' }}>Explore Season</button>
         </motion.div>
       </div>
 
-      {/* Content Section */}
-      <div style={{ padding: '6rem 2rem', background: 'var(--color-bg-base)', position: 'relative', zIndex: 2 }}>
-        <div style={{ maxWidth: '900px', margin: '0 auto' }}>
-          
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
+      <motion.div style={{ opacity, position: 'absolute', bottom: '4rem', right: '5vw', zIndex: 2, display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div style={{ width: '1px', height: '60px', background: 'rgba(255,255,255,0.2)', position: 'relative', overflow: 'hidden' }}>
+          <motion.div 
+            animate={{ y: ['-100%', '100%'] }} transition={{ repeat: Infinity, duration: 1.5, ease: 'linear' }}
+            style={{ width: '100%', height: '50%', background: 'var(--color-accent-primary)' }}
+          />
+        </div>
+        <span style={{ fontFamily: 'var(--font-heading)', fontSize: '0.8rem', letterSpacing: '0.1em', writingMode: 'vertical-rl' }}>SCROLL</span>
+      </motion.div>
+    </div>
+  );
+}
+
+function StandingsSection({ drivers }) {
+  const [hoveredIndex, setHoveredIndex] = useState(null);
+
+  return (
+    <section style={{ padding: '10vw 5vw', position: 'relative', zIndex: 2, background: 'var(--color-bg-base)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '5rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '2rem' }}>
+        <h2 style={{ fontSize: 'clamp(2rem, 4vw, 3rem)', margin: 0 }}>Driver<br/><span style={{ color: 'var(--color-text-secondary)' }}>Standings</span></h2>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        {drivers.map((d, i) => (
+          <motion.div 
+            key={i}
+            onMouseEnter={() => setHoveredIndex(i)}
+            onMouseLeave={() => setHoveredIndex(null)}
+            initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-100px" }}
-            transition={{ duration: 0.6 }}
-            style={{ textAlign: 'center', marginBottom: '4rem' }}
+            transition={{ duration: 0.5, delay: i * 0.1 }}
+            style={{
+              display: 'flex', alignItems: 'center', padding: '1.5rem 2rem', 
+              background: hoveredIndex === i ? 'var(--color-bg-panel)' : 'transparent',
+              border: '1px solid',
+              borderColor: hoveredIndex === i ? 'var(--color-border-hover)' : 'transparent',
+              borderRadius: 'var(--radius-md)',
+              cursor: 'pointer',
+              transition: 'all var(--transition-fast)',
+              position: 'relative',
+              overflow: 'hidden'
+            }}
           >
-            <h2 style={{ fontSize: '2.5rem', marginBottom: '1rem', color: 'var(--color-text-primary)' }}>Live Dashboard</h2>
-            <p style={{ color: 'var(--color-text-secondary)', fontSize: '1.1rem' }}>Get the latest updates direct from the circuit.</p>
+            {/* Team Color Bar */}
+            <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '4px', background: d.color, transform: hoveredIndex === i ? 'scaleY(1)' : 'scaleY(0)', transition: 'transform var(--transition-fast)', transformOrigin: 'center' }} />
+            
+            <div style={{ flex: '0 0 60px', fontFamily: 'var(--font-heading)', fontSize: '2rem', color: hoveredIndex === i ? 'var(--color-text-primary)' : 'var(--color-text-muted)', fontWeight: 600 }}>
+              0{i+1}
+            </div>
+            
+            <div style={{ flex: '1', display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '1.5rem', fontFamily: 'var(--font-heading)', fontWeight: 600 }}>{d.full_name}</span>
+              <span style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{d.team_name}</span>
+            </div>
+            
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.5rem' }}>
+              <span style={{ fontSize: '2rem', fontFamily: 'var(--font-heading)', fontWeight: 600, color: hoveredIndex === i ? 'var(--color-accent-primary)' : 'var(--color-text-primary)' }}>{d.points}</span>
+              <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', paddingBottom: '0.4rem' }}>PTS</span>
+            </div>
           </motion.div>
+        ))}
+      </div>
+    </section>
+  );
+}
 
-          {loading && <LoadingState message="Connecting to timing servers..." />}
-          {error && <ErrorState message={error} onRetry={fetchDashboardData} />}
-          
-          {!loading && !error && data && (
+function CalendarSection({ races }) {
+  return (
+    <section style={{ padding: '10vw 5vw', background: 'var(--color-bg-base)' }}>
+      <div style={{ maxWidth: '800px' }}>
+        <h2 style={{ fontSize: 'clamp(2rem, 4vw, 3rem)', marginBottom: '4rem' }}>Race <span style={{ color: 'var(--color-text-secondary)' }}>Calendar</span></h2>
+        
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {races.map((r, i) => (
             <motion.div 
-              className="glass-panel"
-              initial={{ opacity: 0, y: 40, scale: 0.95 }}
-              whileInView={{ opacity: 1, y: 0, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-              style={{
-                boxShadow: '0 30px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1)',
-                padding: '3rem',
-                border: '1px solid rgba(255,255,255,0.05)'
-              }}
+              key={i}
+              initial={{ opacity: 0, x: -30 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true, margin: "-50px" }}
+              transition={{ duration: 0.6, delay: i * 0.1 }}
+              style={{ display: 'flex', borderBottom: '1px solid var(--color-border)', padding: '2rem 0', gap: '3rem', position: 'relative' }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2.5rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '1.5rem' }}>
-                <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: 'var(--color-accent-primary)', boxShadow: '0 0 10px var(--color-accent-primary)' }}></div>
-                <h3 style={{ margin: 0, fontSize: '1.5rem', letterSpacing: '1px', textTransform: 'uppercase' }}>
-                  {data.type === 'next_gp' ? 'Next Grand Prix' : 'Season Concluded'}
-                </h3>
+              <div style={{ flex: '0 0 100px', display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Round {r.round}</span>
+                <span style={{ fontSize: '1.2rem', color: 'var(--color-text-primary)', fontFamily: 'var(--font-heading)', fontWeight: 600, marginTop: '0.5rem' }}>{r.date}</span>
               </div>
               
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '2rem' }}>
-                {data.type === 'next_gp' ? (
-                  <>
-                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1.5rem', borderRadius: 'var(--radius-md)', borderLeft: '3px solid var(--color-accent-secondary)' }}>
-                      <span style={{ display: 'block', fontSize: '0.85rem', textTransform: 'uppercase', color: 'var(--color-text-secondary)', marginBottom: '0.5rem', letterSpacing: '2px' }}>Event / Year</span>
-                      <strong style={{ fontSize: '1.4rem' }}>{data.data.year} {data.data.country_name || "Grand Prix"}</strong>
-                    </div>
-                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1.5rem', borderRadius: 'var(--radius-md)', borderLeft: '3px solid var(--color-accent-secondary)' }}>
-                      <span style={{ display: 'block', fontSize: '0.85rem', textTransform: 'uppercase', color: 'var(--color-text-secondary)', marginBottom: '0.5rem', letterSpacing: '2px' }}>Meeting</span>
-                      <strong style={{ fontSize: '1.4rem' }}>{data.data.meeting_name || data.data.meeting_official_name}</strong>
-                    </div>
-                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1.5rem', borderRadius: 'var(--radius-md)', borderLeft: '3px solid var(--color-accent-primary)' }}>
-                      <span style={{ display: 'block', fontSize: '0.85rem', textTransform: 'uppercase', color: 'var(--color-text-secondary)', marginBottom: '0.5rem', letterSpacing: '2px' }}>Circuit</span>
-                      <strong style={{ fontSize: '1.4rem' }}>{data.data.circuit_short_name || data.data.location || "TBA"}</strong>
-                    </div>
-                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1.5rem', borderRadius: 'var(--radius-md)', borderLeft: '3px solid var(--color-accent-primary)' }}>
-                      <span style={{ display: 'block', fontSize: '0.85rem', textTransform: 'uppercase', color: 'var(--color-text-secondary)', marginBottom: '0.5rem', letterSpacing: '2px' }}>Start Time</span>
-                      <strong style={{ fontSize: '1.4rem' }}>{new Date(data.data.date_start).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div style={{ background: 'linear-gradient(135deg, rgba(225, 6, 0, 0.1), rgba(0,0,0,0))', borderLeft: '3px solid var(--color-accent-primary)', padding: '2rem', borderRadius: 'var(--radius-md)' }}>
-                      <span style={{ display: 'block', fontSize: '0.85rem', textTransform: 'uppercase', color: 'var(--color-text-secondary)', letterSpacing: '2px' }}>World Driver Champion</span>
-                      <strong style={{ fontSize: '1.8rem', display: 'block', margin: '1rem 0' }}>{data.driver?.full_name || 'TBA'}</strong>
-                      <span style={{ color: 'var(--color-accent-tertiary)', fontWeight: 'bold', fontSize: '1.2rem' }}>{data.driver?.points_current} pts</span>
-                    </div>
-                    <div style={{ background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(0,0,0,0))', borderLeft: '3px solid #ccc', padding: '2rem', borderRadius: 'var(--radius-md)' }}>
-                      <span style={{ display: 'block', fontSize: '0.85rem', textTransform: 'uppercase', color: 'var(--color-text-secondary)', letterSpacing: '2px' }}>World Constructor Champion</span>
-                      <strong style={{ fontSize: '1.8rem', display: 'block', margin: '1rem 0' }}>{data.team?.team_name || 'TBA'}</strong>
-                      <span style={{ color: 'var(--color-accent-tertiary)', fontWeight: 'bold', fontSize: '1.2rem' }}>{data.team?.points_current} pts</span>
-                    </div>
-                  </>
-                )}
+              <div style={{ flex: 1, borderLeft: '1px solid rgba(255,255,255,0.05)', paddingLeft: '3rem' }}>
+                <h4 style={{ fontSize: '1.8rem', margin: '0 0 0.5rem 0' }}>{r.country}</h4>
+                <p style={{ color: 'var(--color-text-secondary)', margin: 0, fontSize: '0.9rem' }}>{r.circuit}</p>
               </div>
             </motion.div>
-          )}
+          ))}
         </div>
       </div>
-    </div>
+    </section>
+  );
+}
+
+function Footer() {
+  return (
+    <footer style={{ padding: '4rem 5vw', background: '#000', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '2rem' }}>
+      <div>
+        <h2 style={{ fontSize: '1.5rem', margin: 0, fontFamily: 'var(--font-heading)' }}><span style={{ color: 'var(--color-accent-primary)' }}>APEX</span>GRID</h2>
+      </div>
+      <div style={{ display: 'flex', gap: '2rem', fontSize: '0.8rem', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-heading)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+        <span>Non-commercial conceptual design</span>
+      </div>
+    </footer>
   );
 }
