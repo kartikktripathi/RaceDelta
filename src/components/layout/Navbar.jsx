@@ -20,7 +20,7 @@ export default function Navbar() {
 
   return (
     <div className={styles.navbarWrapper}>
-      <motion.nav 
+      <motion.nav
         className={styles.navbar}
         variants={{
           visible: { y: 0, opacity: 1, scale: scrolled ? 0.95 : 1 },
@@ -39,9 +39,10 @@ export default function Navbar() {
             <span className="highlight" style={{ color: 'var(--color-accent-primary)' }}>Apex</span>Grid
           </NavLink>
           <div className={styles.links}>
-            <NavLink to="/drivers" className={({isActive}) => isActive ? styles.activeLink : styles.link}>Drivers</NavLink>
-            <NavLink to="/teams" className={({isActive}) => isActive ? styles.activeLink : styles.link}>Teams</NavLink>
-            <NavLink to="/seasons" className={({isActive}) => isActive ? styles.activeLink : styles.link}>Seasons</NavLink>
+            <NavLink to="/drivers" className={({ isActive }) => isActive ? styles.activeLink : styles.link}>Drivers</NavLink>
+            <NavLink to="/teams" className={({ isActive }) => isActive ? styles.activeLink : styles.link}>Teams</NavLink>
+            <NavLink to="/seasons" className={({ isActive }) => isActive ? styles.activeLink : styles.link}>Races</NavLink>
+            <NavLink to="/sprint" className={({ isActive }) => isActive ? styles.activeLink : styles.link}>Sprint</NavLink>
           </div>
         </div>
       </motion.nav>

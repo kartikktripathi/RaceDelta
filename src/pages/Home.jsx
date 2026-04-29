@@ -5,26 +5,13 @@ import { f1Api } from '../utils/api';
 
 const HERO_IMG = './frontBG.png';
 
-// Mock data fallbacks for design if API fails entirely
-const mockDrivers = [
-  { driver_number: 1, full_name: "Max Verstappen", team_name: "Red Bull Racing", points: 395, color: "#3671C6" },
-  { driver_number: 16, full_name: "Charles Leclerc", team_name: "Ferrari", points: 307, color: "#E80020" },
-  { driver_number: 4, full_name: "Lando Norris", team_name: "McLaren", points: 285, color: "#FF8000" },
-  { driver_number: 55, full_name: "Carlos Sainz", team_name: "Ferrari", points: 244, color: "#E80020" },
-];
-
-const mockRaces = [
-  { round: 1, country: "Bahrain", circuit: "Bahrain International Circuit", date: "Mar 02" },
-  { round: 2, country: "Saudi Arabia", circuit: "Jeddah Corniche Circuit", date: "Mar 09" },
-  { round: 3, country: "Australia", circuit: "Albert Park Circuit", date: "Mar 24" },
-  { round: 4, country: "Japan", circuit: "Suzuka International Racing Course", date: "Apr 07" },
-];
-
+// Using real data from the API, starting with empty states
 export default function Home() {
   const navigate = useNavigate();
-  const [drivers, setDrivers] = useState(mockDrivers);
-  const [races, setRaces] = useState(mockRaces);
-  
+  const [drivers, setDrivers] = useState([]);
+  const [races, setRaces] = useState([]);
+  const [loading, setLoading] = useState(true);
+
   const containerRef = useRef(null);
   const { scrollYProgress } = useScroll({
     target: containerRef,
@@ -45,11 +32,11 @@ export default function Home() {
           const sorted = d.sort((a, b) => b.points_current - a.points_current).slice(0, 5).map(driver => {
             const driverInfo = allDrivers.find(x => x.driver_number === driver.driver_number) || {};
             return {
-               driver_number: driver.driver_number,
-               full_name: driverInfo.full_name || 'Unknown Driver',
-               team_name: driverInfo.team_name || 'Unknown Team',
-               points: driver.points_current,
-               color: driverInfo.team_colour ? `#${driverInfo.team_colour}` : '#ffffff'
+              driver_number: driver.driver_number,
+              full_name: driverInfo.full_name || 'Unknown Driver',
+              team_name: driverInfo.team_name || 'Unknown Team',
+              points: driver.points_current,
+              color: driverInfo.team_colour ? `#${driverInfo.team_colour}` : '#ffffff'
             };
           });
           setDrivers(sorted);
@@ -58,10 +45,10 @@ export default function Home() {
         // Fetch calendar
         let currentYear = new Date().getFullYear();
         let meetings = await f1Api.getMeetings(currentYear);
-        
+
         // If current year is empty (e.g., 2026 data not yet available), fallback to 2024
         if (!meetings || meetings.length === 0) {
-           meetings = await f1Api.getMeetings(2024);
+          meetings = await f1Api.getMeetings(2024);
         }
 
         if (meetings && meetings.length > 0) {
@@ -70,9 +57,10 @@ export default function Home() {
             country: m.country_name,
             circuit: m.circuit_short_name || m.location,
             date: new Date(m.date_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-            rawDate: new Date(m.date_start)
+            rawDate: new Date(m.date_start),
+            image: m.circuit_image // Fetched dynamically from the API!
           }));
-          
+
           const now = new Date();
           let upcoming = sortedM.filter(m => {
             // Treat the fetched schedule as if it's running in the current year to show upcoming races correctly
@@ -80,7 +68,7 @@ export default function Home() {
             virtualDate.setFullYear(now.getFullYear());
             return virtualDate >= now;
           });
-          
+
           // If all races are in the past relative to current day/month, just show the last 5 races
           if (upcoming.length === 0) upcoming = sortedM.slice(-5);
           else upcoming = upcoming.slice(0, 5);
@@ -88,7 +76,9 @@ export default function Home() {
           setRaces(upcoming);
         }
       } catch (err) {
-        console.log("Using mock data due to API error", err);
+        console.log("Failed to load API data", err);
+      } finally {
+        setLoading(false);
       }
     };
     loadData();
@@ -96,15 +86,15 @@ export default function Home() {
 
   return (
     <div ref={containerRef} style={{ background: 'var(--color-bg-base)', minHeight: '100vh', width: '100vw', left: '50%', right: '50%', marginLeft: '-50vw', marginRight: '-50vw', position: 'relative' }}>
-      
+
       {/* 1. HERO SECTION */}
       <HeroSection scrollYProgress={scrollYProgress} onExplore={() => navigate('/seasons')} />
 
       {/* 2. DRIVER STANDINGS */}
-      <StandingsSection drivers={drivers} />
+      {!loading && drivers.length > 0 && <StandingsSection drivers={drivers} />}
 
       {/* 3. RACE CALENDAR TIMELINE */}
-      <CalendarSection races={races} />
+      {!loading && races.length > 0 && <CalendarSection races={races} />}
 
       {/* 4. FOOTER */}
       <Footer />
@@ -118,7 +108,7 @@ function HeroSection({ scrollYProgress, onExplore }) {
 
   return (
     <div style={{ height: '100vh', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-      <motion.div 
+      <motion.div
         style={{
           position: 'absolute', top: '-10%', left: 0, right: 0, bottom: '-10%',
           backgroundImage: `url(${HERO_IMG})`, backgroundSize: 'cover', backgroundPosition: 'center',
@@ -126,7 +116,7 @@ function HeroSection({ scrollYProgress, onExplore }) {
         }}
       />
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '50vh', background: 'linear-gradient(to top, var(--color-bg-base), transparent)', zIndex: 1 }} />
-      
+
       <div style={{ position: 'relative', zIndex: 2, padding: '0 5vw', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         <motion.p
           initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.8, delay: 0.2 }}
@@ -134,12 +124,12 @@ function HeroSection({ scrollYProgress, onExplore }) {
         >
           World Championship
         </motion.p>
-        
+
         <motion.h1
           initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
           style={{ fontSize: 'clamp(3.5rem, 8vw, 9rem)', lineHeight: 0.85, margin: 0, maxWidth: '1200px' }}
         >
-          THE APEX <br/>
+          THE APEX <br />
           <span style={{ color: 'transparent', WebkitTextStroke: '1px rgba(255,255,255,0.3)' }}>OF MOTORSPORT</span>
         </motion.h1>
 
@@ -150,7 +140,7 @@ function HeroSection({ scrollYProgress, onExplore }) {
 
       <motion.div style={{ opacity, position: 'absolute', bottom: '4rem', right: '5vw', zIndex: 2, display: 'flex', alignItems: 'center', gap: '1rem' }}>
         <div style={{ width: '1px', height: '60px', background: 'rgba(255,255,255,0.2)', position: 'relative', overflow: 'hidden' }}>
-          <motion.div 
+          <motion.div
             animate={{ y: ['-100%', '100%'] }} transition={{ repeat: Infinity, duration: 1.5, ease: 'linear' }}
             style={{ width: '100%', height: '50%', background: 'var(--color-accent-primary)' }}
           />
@@ -167,12 +157,12 @@ function StandingsSection({ drivers }) {
   return (
     <section style={{ padding: '10vw 5vw', position: 'relative', zIndex: 2, background: 'var(--color-bg-base)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '5rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '2rem' }}>
-        <h2 style={{ fontSize: 'clamp(2rem, 4vw, 3rem)', margin: 0 }}>Driver<br/><span style={{ color: 'var(--color-text-secondary)' }}>Standings</span></h2>
+        <h2 style={{ fontSize: 'clamp(2rem, 4vw, 3rem)', margin: 0 }}>Driver<br /><span style={{ color: 'var(--color-text-secondary)' }}>Standings</span></h2>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         {drivers.map((d, i) => (
-          <motion.div 
+          <motion.div
             key={i}
             onMouseEnter={() => setHoveredIndex(i)}
             onMouseLeave={() => setHoveredIndex(null)}
@@ -181,7 +171,7 @@ function StandingsSection({ drivers }) {
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.5, delay: i * 0.1 }}
             style={{
-              display: 'flex', alignItems: 'center', padding: '1.5rem 2rem', 
+              display: 'flex', alignItems: 'center', padding: '1.5rem 2rem',
               background: hoveredIndex === i ? 'var(--color-bg-panel)' : 'transparent',
               border: '1px solid',
               borderColor: hoveredIndex === i ? 'var(--color-border-hover)' : 'transparent',
@@ -194,16 +184,16 @@ function StandingsSection({ drivers }) {
           >
             {/* Team Color Bar */}
             <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '4px', background: d.color, transform: hoveredIndex === i ? 'scaleY(1)' : 'scaleY(0)', transition: 'transform var(--transition-fast)', transformOrigin: 'center' }} />
-            
+
             <div style={{ flex: '0 0 60px', fontFamily: 'var(--font-heading)', fontSize: '2rem', color: hoveredIndex === i ? 'var(--color-text-primary)' : 'var(--color-text-muted)', fontWeight: 600 }}>
-              0{i+1}
+              0{i + 1}
             </div>
-            
+
             <div style={{ flex: '1', display: 'flex', flexDirection: 'column' }}>
               <span style={{ fontSize: '1.5rem', fontFamily: 'var(--font-heading)', fontWeight: 600 }}>{d.full_name}</span>
               <span style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{d.team_name}</span>
             </div>
-            
+
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.5rem' }}>
               <span style={{ fontSize: '2rem', fontFamily: 'var(--font-heading)', fontWeight: 600, color: hoveredIndex === i ? 'var(--color-accent-primary)' : 'var(--color-text-primary)' }}>{d.points}</span>
               <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', paddingBottom: '0.4rem' }}>PTS</span>
@@ -220,10 +210,10 @@ function CalendarSection({ races }) {
     <section style={{ padding: '10vw 5vw', background: 'var(--color-bg-base)' }}>
       <div style={{ maxWidth: '800px' }}>
         <h2 style={{ fontSize: 'clamp(2rem, 4vw, 3rem)', marginBottom: '4rem' }}>Race <span style={{ color: 'var(--color-text-secondary)' }}>Calendar</span></h2>
-        
+
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {races.map((r, i) => (
-            <motion.div 
+            <motion.div
               key={i}
               initial={{ opacity: 0, x: -30 }}
               whileInView={{ opacity: 1, x: 0 }}
@@ -235,11 +225,30 @@ function CalendarSection({ races }) {
                 <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Round {r.round}</span>
                 <span style={{ fontSize: '1.2rem', color: 'var(--color-text-primary)', fontFamily: 'var(--font-heading)', fontWeight: 600, marginTop: '0.5rem' }}>{r.date}</span>
               </div>
-              
-              <div style={{ flex: 1, borderLeft: '1px solid rgba(255,255,255,0.05)', paddingLeft: '3rem' }}>
+
+              <div style={{ flex: 1, borderLeft: '1px solid rgba(255,255,255,0.05)', paddingLeft: '3rem', zIndex: 1 }}>
                 <h4 style={{ fontSize: '1.8rem', margin: '0 0 0.5rem 0' }}>{r.country}</h4>
                 <p style={{ color: 'var(--color-text-secondary)', margin: 0, fontSize: '0.9rem' }}>{r.circuit}</p>
               </div>
+
+              {/* Dynamic Circuit Figure fetched from API */}
+              {r.image && (
+                <div style={{
+                  position: 'absolute',
+                  right: '0',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: '150px',
+                  height: '100%',
+                  backgroundImage: `url(${r.image})`,
+                  backgroundSize: 'contain',
+                  backgroundPosition: 'right center',
+                  backgroundRepeat: 'no-repeat',
+                  filter: 'invert(1) opacity(0.2)',
+                  pointerEvents: 'none',
+                  zIndex: 0
+                }} />
+              )}
             </motion.div>
           ))}
         </div>

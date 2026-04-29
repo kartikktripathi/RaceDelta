@@ -7,6 +7,7 @@ import Home from './pages/Home'
 import Drivers from './pages/Drivers'
 import Teams from './pages/Teams'
 import Seasons from './pages/Seasons'
+import Sprint from './pages/Sprint'
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
           <Route path="/drivers" element={<Drivers />} />
           <Route path="/teams" element={<Teams />} />
           <Route path="/seasons" element={<Seasons />} />
+          <Route path="/sprint" element={<Sprint />} />
         </Routes>
       </PageLayout>
     </Router>
