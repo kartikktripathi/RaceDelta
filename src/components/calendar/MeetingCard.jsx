@@ -5,6 +5,7 @@ import { f1Api } from '../../utils/api';
 export default function MeetingCard({ meeting, raceSession, isNextRace, index }) {
   const [podium, setPodium] = useState(null);
   const [loadingWinner, setLoadingWinner] = useState(false);
+  const [inView, setInView] = useState(false);
 
   const isCancelled = meeting.is_cancelled === true;
   const isCompleted = !isCancelled && raceSession && new Date(raceSession.date_start) < new Date();
@@ -12,15 +13,19 @@ export default function MeetingCard({ meeting, raceSession, isNextRace, index })
   useEffect(() => {
     let isMounted = true;
     let timerId = null;
+    let retryCount = 0;
 
     const fetchPodium = async () => {
-      if (!isMounted) return;
+      if (!isMounted || !inView) return;
       setLoadingWinner(true);
       try {
         const positions = await f1Api.getPositions(raceSession.session_key, 3);
-        const p1 = positions.find(p => p.position === 1);
-        const p2 = positions.find(p => p.position === 2);
-        const p3 = positions.find(p => p.position === 3);
+        // Reverse to get the latest (final) positions instead of starting grid
+        const finalPositions = [...positions].reverse();
+        
+        const p1 = finalPositions.find(p => p.position === 1);
+        const p2 = finalPositions.find(p => p.position === 2);
+        const p3 = finalPositions.find(p => p.position === 3);
         
         if (p1) {
           const drivers = await f1Api.getDrivers(raceSession.session_key);
@@ -33,29 +38,31 @@ export default function MeetingCard({ meeting, raceSession, isNextRace, index })
               setPodium(podiumDrivers);
               setLoadingWinner(false); 
             }
-            return; // Success! Exit function.
+            return; // Success!
           }
         }
       } catch (error) {
         console.error("Failed to fetch podium for", meeting.meeting_name);
       }
       
-      // If we failed or didn't find the winner, retry in 10 seconds
-      if (isMounted) {
-        timerId = setTimeout(fetchPodium, 10000);
+      // If failed, retry with backoff to prevent API spam (max 3 retries)
+      if (isMounted && retryCount < 3) {
+        retryCount++;
+        timerId = setTimeout(fetchPodium, 10000 * retryCount);
+      } else if (isMounted) {
+        setLoadingWinner(false); // Give up after 3 retries
       }
     };
 
-    if (isCompleted && raceSession) {
-      // Short initial delay based on index to prevent 20 requests hitting immediately
-      timerId = setTimeout(fetchPodium, index * 200);
+    if (isCompleted && raceSession && inView && !podium) {
+      timerId = setTimeout(fetchPodium, index * 100);
     }
     
     return () => {
       isMounted = false;
       if (timerId) clearTimeout(timerId);
     };
-  }, [isCompleted, raceSession, index, meeting.meeting_name]);
+  }, [isCompleted, raceSession, index, meeting.meeting_name, inView, podium]);
 
   const startDate = new Date(meeting.date_start).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   const endDate = new Date(meeting.date_end).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
@@ -67,6 +74,7 @@ export default function MeetingCard({ meeting, raceSession, isNextRace, index })
     <motion.div
       initial={{ opacity: 0, y: 30 }}
       whileInView={{ opacity: 1, y: 0 }}
+      onViewportEnter={() => setInView(true)}
       viewport={{ once: true, margin: "-100px" }}
       transition={{ duration: 0.6, ease: "easeOut" }}
       style={{
@@ -152,7 +160,7 @@ export default function MeetingCard({ meeting, raceSession, isNextRace, index })
         {/* Meeting Info */}
         <div style={{ flex: 1 }}>
           <h2 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.5rem)', fontFamily: 'var(--font-heading)', margin: '0 0 0.5rem 0', textTransform: 'uppercase', lineHeight: 1.1 }}>
-            {meeting.meeting_official_name || meeting.meeting_name}
+            {(meeting.meeting_official_name || meeting.meeting_name || '').replace(/formula 1/ig, '').replace(/\s{2,}/g, ' ').trim()}
           </h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: 'var(--color-text-secondary)', fontSize: '1rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
             <span>{meeting.circuit_short_name}</span>

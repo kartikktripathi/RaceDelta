@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useDrivers, useChampionshipDrivers } from '../hooks/useF1Data';
 import { f1Api } from '../utils/api';
-import LoadingState from '../components/common/LoadingState';
-import ErrorState from '../components/common/ErrorState';
+import LoadingState from '../components/ui/LoadingState';
+import ErrorState from '../components/ui/ErrorState';
 import DriverCard from '../components/driver/DriverCard';
 
 export default function Drivers() {

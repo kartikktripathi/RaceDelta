@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
+import { motion, useScroll, useTransform } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { f1Api } from '../utils/api';
 
-const HERO_IMG = '/hero_f1_car_1777223873047.png';
+const HERO_IMG = './frontBG.png';
 
 // Mock data fallbacks for design if API fails entirely
 const mockDrivers = [

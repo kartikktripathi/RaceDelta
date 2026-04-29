@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { f1Api } from '../utils/api';
-import LoadingState from '../components/common/LoadingState';
-import ErrorState from '../components/common/ErrorState';
+import LoadingState from '../components/ui/LoadingState';
+import ErrorState from '../components/ui/ErrorState';
 import MeetingCard from '../components/calendar/MeetingCard';
 
 export default function Seasons() {
