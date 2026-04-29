@@ -18,11 +18,13 @@ export default function Home() {
     offset: ["start start", "end end"]
   });
 
-  // Fetch real data to override mocks if available
+  // Fetch real data from APIs
   useEffect(() => {
     const loadData = async () => {
+      setLoading(true);
+
+      // 1. Fetch Drivers
       try {
-        // Fetch championship points and driver details
         const [d, allDrivers] = await Promise.all([
           f1Api.getChampionshipDrivers('latest'),
           f1Api.getDrivers('latest')
@@ -41,12 +43,15 @@ export default function Home() {
           });
           setDrivers(sorted);
         }
+      } catch (err) {
+        console.log("Failed to load driver API data", err);
+      }
 
-        // Fetch calendar
+      // 2. Fetch Calendar
+      try {
         let currentYear = new Date().getFullYear();
         let meetings = await f1Api.getMeetings(currentYear);
 
-        // If current year is empty (e.g., 2026 data not yet available), fallback to 2024
         if (!meetings || meetings.length === 0) {
           meetings = await f1Api.getMeetings(2024);
         }
@@ -58,29 +63,28 @@ export default function Home() {
             circuit: m.circuit_short_name || m.location,
             date: new Date(m.date_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
             rawDate: new Date(m.date_start),
-            image: m.circuit_image // Fetched dynamically from the API!
+            image: m.circuit_image // Fetched dynamically from the API
           }));
 
           const now = new Date();
           let upcoming = sortedM.filter(m => {
-            // Treat the fetched schedule as if it's running in the current year to show upcoming races correctly
             const virtualDate = new Date(m.rawDate);
             virtualDate.setFullYear(now.getFullYear());
             return virtualDate >= now;
           });
 
-          // If all races are in the past relative to current day/month, just show the last 5 races
           if (upcoming.length === 0) upcoming = sortedM.slice(-5);
           else upcoming = upcoming.slice(0, 5);
 
           setRaces(upcoming);
         }
       } catch (err) {
-        console.log("Failed to load API data", err);
-      } finally {
-        setLoading(false);
+        console.log("Failed to load calendar API data", err);
       }
+
+      setLoading(false);
     };
+
     loadData();
   }, []);
 

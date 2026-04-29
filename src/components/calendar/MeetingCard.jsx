@@ -9,7 +9,7 @@ export default function MeetingCard({ meeting, raceSession, isNextRace, index })
 
   const isCancelled = meeting.is_cancelled === true;
   const isCompleted = !isCancelled && raceSession && new Date(raceSession.date_start) < new Date();
-  
+
   useEffect(() => {
     let isMounted = true;
     let timerId = null;
@@ -22,21 +22,21 @@ export default function MeetingCard({ meeting, raceSession, isNextRace, index })
         const positions = await f1Api.getPositions(raceSession.session_key, 3);
         // Reverse to get the latest (final) positions instead of starting grid
         const finalPositions = [...positions].reverse();
-        
+
         const p1 = finalPositions.find(p => p.position === 1);
         const p2 = finalPositions.find(p => p.position === 2);
         const p3 = finalPositions.find(p => p.position === 3);
-        
+
         if (p1) {
           const drivers = await f1Api.getDrivers(raceSession.session_key);
           const getDriver = (p) => p ? drivers.find(d => d.driver_number === p.driver_number) : null;
-          
+
           const podiumDrivers = [getDriver(p1), getDriver(p2), getDriver(p3)].filter(Boolean);
-          
+
           if (podiumDrivers.length > 0) {
             if (isMounted) {
               setPodium(podiumDrivers);
-              setLoadingWinner(false); 
+              setLoadingWinner(false);
             }
             return; // Success!
           }
@@ -44,7 +44,7 @@ export default function MeetingCard({ meeting, raceSession, isNextRace, index })
       } catch (error) {
         console.error("Failed to fetch podium for", meeting.meeting_name);
       }
-      
+
       // If failed, retry with backoff to prevent API spam (max 3 retries)
       if (isMounted && retryCount < 3) {
         retryCount++;
@@ -57,7 +57,7 @@ export default function MeetingCard({ meeting, raceSession, isNextRace, index })
     if (isCompleted && raceSession && inView && !podium) {
       timerId = setTimeout(fetchPodium, index * 100);
     }
-    
+
     return () => {
       isMounted = false;
       if (timerId) clearTimeout(timerId);
@@ -138,13 +138,13 @@ export default function MeetingCard({ meeting, raceSession, isNextRace, index })
 
       {/* Main Content */}
       <div style={{ padding: '2.5rem', display: 'flex', gap: '2rem', flex: 1, zIndex: 1, alignItems: 'center' }}>
-        
+
         {/* Flag & Date Col */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', flex: '0 0 120px' }}>
-          <img 
-            src={meeting.country_flag} 
-            alt={meeting.country_name} 
-            style={{ width: '60px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)' }} 
+          <img
+            src={meeting.country_flag}
+            alt={meeting.country_name}
+            style={{ width: '60px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)' }}
           />
           <div>
             <div style={{ fontSize: '1.5rem', fontFamily: 'var(--font-heading)', color: '#fff', lineHeight: 1 }}>{startDate.split(' ')[0]}</div>
@@ -174,15 +174,15 @@ export default function MeetingCard({ meeting, raceSession, isNextRace, index })
               <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.2em' }}>
                 Podium Results
               </div>
-              
+
               {loadingWinner ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
-                   <motion.div
-                     animate={{ rotate: 360 }}
-                     transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-                     style={{ width: '12px', height: '12px', border: '2px solid rgba(255,255,255,0.1)', borderTopColor: 'var(--color-accent-primary)', borderRadius: '50%' }}
-                   />
-                   Syncing telemetry results...
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                    style={{ width: '12px', height: '12px', border: '2px solid rgba(255,255,255,0.1)', borderTopColor: 'var(--color-accent-primary)', borderRadius: '50%' }}
+                  />
+                  Syncing telemetry results...
                 </div>
               ) : podium ? (
                 <div style={{ display: 'flex', gap: '3rem', flexWrap: 'wrap' }}>
@@ -205,7 +205,7 @@ export default function MeetingCard({ meeting, raceSession, isNextRace, index })
             </div>
           )}
         </div>
-        
+
       </div>
     </motion.div>
   );
