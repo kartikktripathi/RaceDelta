@@ -4,27 +4,39 @@ import { f1Api } from '../utils/api';
 export function useF1Fetch(fetchFn, dependencies = []) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  const execute = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await fetchFn();
-      setData(result);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, dependencies);
 
   useEffect(() => {
-    execute();
-  }, [execute]);
+    let isMounted = true;
+    let timerId = null;
 
-  return { data, loading, error, refetch: execute };
+    const execute = async () => {
+      if (isMounted) {
+        setLoading(true);
+      }
+      try {
+        const result = await fetchFn();
+        if (isMounted) {
+          setData(result);
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error("API Fetch Error:", err);
+        if (isMounted) {
+          timerId = setTimeout(execute, 10000);
+        }
+      }
+    };
+
+    execute();
+
+    return () => {
+      isMounted = false;
+      if (timerId) clearTimeout(timerId);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, dependencies);
+
+  return { data, loading, error: null, refetch: () => {} };
 }
 
 // Specific hooks

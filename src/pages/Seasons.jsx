@@ -15,29 +15,42 @@ export default function Seasons() {
   const years = [2026, 2025, 2024, 2023];
 
   useEffect(() => {
+    let isMounted = true;
+    let timerId = null;
+
     const fetchCalendar = async () => {
-      setLoading(true);
-      setError(null);
+      if (isMounted) {
+        setLoading(true);
+        setError(null);
+      }
       try {
         const [meetingsData, sessionsData] = await Promise.all([
           f1Api.getMeetings(selectedYear),
           f1Api.getSessions(selectedYear, 'Race')
         ]);
         
+        if (!isMounted) return;
+
         // Filter out testing
         const validMeetings = meetingsData.filter(m => m.meeting_name !== 'Pre-Season Testing');
         
         setMeetings(validMeetings);
         setRaceSessions(sessionsData);
-      } catch (err) {
-        setError("Failed to load race calendar. Please check your connection.");
-        console.error(err);
-      } finally {
         setLoading(false);
+      } catch (err) {
+        console.error("Failed to load race calendar:", err);
+        if (isMounted) {
+          timerId = setTimeout(fetchCalendar, 10000);
+        }
       }
     };
 
     fetchCalendar();
+
+    return () => {
+      isMounted = false;
+      if (timerId) clearTimeout(timerId);
+    };
   }, [selectedYear]);
 
   // Determine next race

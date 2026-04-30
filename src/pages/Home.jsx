@@ -18,10 +18,12 @@ export default function Home() {
     offset: ["start start", "end end"]
   });
 
-  // Fetch real data from APIs
   useEffect(() => {
+    let isMounted = true;
+    let timerId = null;
+
     const loadData = async () => {
-      setLoading(true);
+      let hasError = false;
 
       // 1. Fetch Drivers
       try {
@@ -41,10 +43,11 @@ export default function Home() {
               color: driverInfo.team_colour ? `#${driverInfo.team_colour}` : '#ffffff'
             };
           });
-          setDrivers(sorted);
+          if (isMounted) setDrivers(sorted);
         }
       } catch (err) {
-        console.log("Failed to load driver API data", err);
+        console.error("Failed to load driver API data:", err);
+        hasError = true;
       }
 
       // 2. Fetch Calendar
@@ -76,16 +79,27 @@ export default function Home() {
           if (upcoming.length === 0) upcoming = sortedM.slice(-5);
           else upcoming = upcoming.slice(0, 5);
 
-          setRaces(upcoming);
+          if (isMounted) setRaces(upcoming);
         }
       } catch (err) {
-        console.log("Failed to load calendar API data", err);
+        console.error("Failed to load calendar API data:", err);
+        hasError = true;
       }
 
-      setLoading(false);
+      if (isMounted) {
+        setLoading(false);
+        if (hasError) {
+          timerId = setTimeout(loadData, 10000);
+        }
+      }
     };
 
     loadData();
+
+    return () => {
+      isMounted = false;
+      if (timerId) clearTimeout(timerId);
+    };
   }, []);
 
   return (

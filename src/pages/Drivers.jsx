@@ -11,34 +11,43 @@ export default function Drivers() {
   const [sessionKey, setSessionKey] = useState('latest');
   const [loadingSession, setLoadingSession] = useState(false);
 
-  // Fetch the correct session key for past years
   useEffect(() => {
+    let isMounted = true;
+    let timerId = null;
+
     const fetchSessionForYear = async () => {
       const currentYear = new Date().getFullYear();
       if (selectedYear === currentYear) {
-        setSessionKey('latest');
+        if (isMounted) setSessionKey('latest');
         return;
       }
       
-      setLoadingSession(true);
+      if (isMounted) setLoadingSession(true);
       try {
         const sessions = await f1Api.getSessions(selectedYear);
+        if (!isMounted) return;
         if (sessions && sessions.length > 0) {
-          // Select the last session of that year
           const lastSession = sessions[sessions.length - 1];
           setSessionKey(lastSession.session_key);
+          setLoadingSession(false);
         } else {
-          setSessionKey('invalid'); // No sessions found
+          setSessionKey('invalid');
+          setLoadingSession(false);
         }
       } catch (error) {
         console.error("Failed to fetch sessions for year", error);
-        setSessionKey('invalid');
-      } finally {
-        setLoadingSession(false);
+        if (isMounted) {
+          timerId = setTimeout(fetchSessionForYear, 10000);
+        }
       }
     };
 
     fetchSessionForYear();
+
+    return () => {
+      isMounted = false;
+      if (timerId) clearTimeout(timerId);
+    };
   }, [selectedYear]);
 
   const { data: driversData, loading: loadingDrivers, error: errorDrivers, refetch: refetchDrivers } = useDrivers(sessionKey);

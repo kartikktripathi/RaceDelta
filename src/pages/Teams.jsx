@@ -14,10 +14,15 @@ export default function Teams() {
 
   // Fetch sessions to determine completed races and session key
   useEffect(() => {
+    let isMounted = true;
+    let timerId = null;
+
     const fetchSessionForYear = async () => {
-      setLoadingSession(true);
+      if (isMounted) setLoadingSession(true);
       try {
         const sessions = await f1Api.getSessions(selectedYear);
+        if (!isMounted) return;
+        
         let count = 0;
         
         if (sessions && sessions.length > 0) {
@@ -41,20 +46,26 @@ export default function Teams() {
             const lastSession = sessions[count - 1];
             setSessionKey(lastSession.session_key);
           }
+          setLoadingSession(false);
         } else {
           setCompletedRaces(0);
           setSessionKey('invalid'); // No sessions found
+          setLoadingSession(false);
         }
       } catch (error) {
         console.error("Failed to fetch sessions for year", error);
-        setCompletedRaces(0);
-        setSessionKey('invalid');
-      } finally {
-        setLoadingSession(false);
+        if (isMounted) {
+          timerId = setTimeout(fetchSessionForYear, 10000);
+        }
       }
     };
 
     fetchSessionForYear();
+
+    return () => {
+      isMounted = false;
+      if (timerId) clearTimeout(timerId);
+    };
   }, [selectedYear]);
 
   const { data: driversData, loading: loadingDrivers, error: errorDrivers, refetch: refetchDrivers } = useDrivers(sessionKey);

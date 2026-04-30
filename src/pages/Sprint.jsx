@@ -15,15 +15,22 @@ export default function Sprint() {
   const years = [2026, 2025, 2024, 2023];
 
   useEffect(() => {
+    let isMounted = true;
+    let timerId = null;
+
     const fetchCalendar = async () => {
-      setLoading(true);
-      setError(null);
+      if (isMounted) {
+        setLoading(true);
+        setError(null);
+      }
       try {
         const [meetingsData, sessionsData] = await Promise.all([
           f1Api.getMeetings(selectedYear),
           f1Api.getSessions(selectedYear, 'Sprint')
         ]);
         
+        if (!isMounted) return;
+
         // Filter out testing and keep only meetings with a sprint session
         const validMeetings = meetingsData.filter(m => 
           m.meeting_name !== 'Pre-Season Testing' && 
@@ -32,15 +39,21 @@ export default function Sprint() {
         
         setMeetings(validMeetings);
         setSprintSessions(sessionsData);
-      } catch (err) {
-        setError("Failed to load sprint calendar. Please check your connection.");
-        console.error(err);
-      } finally {
         setLoading(false);
+      } catch (err) {
+        console.error("Failed to load sprint calendar:", err);
+        if (isMounted) {
+          timerId = setTimeout(fetchCalendar, 10000);
+        }
       }
     };
 
     fetchCalendar();
+
+    return () => {
+      isMounted = false;
+      if (timerId) clearTimeout(timerId);
+    };
   }, [selectedYear]);
 
   // Determine next sprint race
